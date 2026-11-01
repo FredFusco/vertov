@@ -42,8 +42,15 @@ def main() -> None:
     with zipfile.ZipFile(pacchetto, "w", zipfile.ZIP_DEFLATED) as z:
         for rel in file_del_programma():
             z.write(CARTELLA / rel, rel)
+    # Su GitHub il pacchetto si indica con l'indirizzo della sua release, non con "latest": per qualche
+    # minuto dopo una pubblicazione "latest" può dare l'annuncio vecchio e il pacchetto nuovo, o viceversa.
+    indirizzo = json.loads((CARTELLA / "aggiornamenti.json").read_text())["indirizzo"]
+    if pubblica and "/releases/latest/download/" in indirizzo:
+        dove = indirizzo.split("/releases/latest/download/")[0] + f"/releases/download/v{versione}/{pacchetto.name}"
+    else:
+        dove = pacchetto.name
     annuncio = {"versione": versione, "data": date.today().isoformat(), "novita": novita,
-                "pacchetto": pacchetto.name, "sha256": hashlib.sha256(pacchetto.read_bytes()).hexdigest()}
+                "pacchetto": dove, "sha256": hashlib.sha256(pacchetto.read_bytes()).hexdigest()}
     (dist / "vertov.json").write_text(json.dumps(annuncio, ensure_ascii=False, indent=2))
     print(f"Pronti {pacchetto.name} e vertov.json in {dist}.")
     if pubblica:
