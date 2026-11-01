@@ -196,7 +196,16 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 .zona .invito { margin-top: auto; text-align: center; color: var(--tenue); font: italic 15px/1.6 var(--serif); padding: 18px 6px; }
 .zona.piena .invito { padding: 6px; font-size: 13px; }
 .zona .invito .bottone { margin-top: 6px; }
-.elementi { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.elementi { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; align-content: start; }
+/* Con tanti file i riquadri non si allungano: la lista scorre al loro interno. */
+.elementi, .scartati { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--linea) transparent; }
+.elementi { max-height: 440px; }
+.elementi.scorre { padding-right: 6px; margin-right: -6px; }
+.elementi::-webkit-scrollbar, .scartati::-webkit-scrollbar { width: 8px; }
+.elementi::-webkit-scrollbar-thumb, .scartati::-webkit-scrollbar-thumb { background: var(--linea); border-radius: 4px; }
+.elementi::-webkit-scrollbar-thumb:hover, .scartati::-webkit-scrollbar-thumb:hover { background: var(--tenue); }
+.elementi::-webkit-scrollbar-track, .scartati::-webkit-scrollbar-track { background: transparent; }
+.conta-file { font-size: 12px; color: var(--tenue); font-style: italic; }
 .elemento { border: 1px solid var(--linea); border-radius: 8px; padding: 8px 10px; background: var(--carta); }
 .riga-el { display: flex; flex-direction: column; gap: 1px; }
 .elemento .ruolo { font: italic 13px/1.2 var(--serif); color: var(--rosso); }
@@ -210,7 +219,7 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 .mancanti { font-size: 12px; color: var(--avviso); font-style: italic; display: grid; gap: 2px; }
 .esito-arrivo { font-size: 13.5px; margin-top: 12px; min-height: 1.4em; color: var(--ok); }
 .esito-arrivo.attesa { color: var(--avviso); font-style: italic; }
-.scartati { display: grid; gap: 8px; margin-top: 8px; }
+.scartati { display: grid; gap: 8px; margin-top: 8px; max-height: 240px; }
 .scartato { border: 1px dashed var(--rosso); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; }
 .cartella-risultati { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13.5px; color: var(--tenue); }
 
@@ -466,6 +475,7 @@ function mostraScheda(nome) {
   document.querySelectorAll("[role=tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.scheda === nome));
   document.querySelectorAll("[role=tabpanel]").forEach(p => p.hidden = p.id !== "scheda-" + nome);
   try { localStorage.setItem("vertov-scheda", nome); } catch {}
+  if (nome === "materiali" && typeof segnaScorrimento === "function") segnaScorrimento();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll("[role=tab]").forEach(b => b.onclick = () => mostraScheda(b.dataset.scheda));
@@ -554,6 +564,16 @@ document.addEventListener("click", e => {
 /* ---------- materiali ---------- */
 let firmaMateriali = "", mancanti = [];
 function nomeFile(p) { return p.split("/").filter(Boolean).pop(); }
+function segnaScorrimento() {
+  // Quando una lista scorre, si dice quanti file ci sono: non tutti sono visibili.
+  for (const lista of document.querySelectorAll(".zona .elementi")) {
+    lista.classList.toggle("scorre", lista.scrollHeight > lista.clientHeight + 1);
+    let conta = lista.parentElement.querySelector(".conta-file");
+    if (!conta) { conta = crea("div", "conta-file"); lista.after(conta); }
+    testo(conta, lista.classList.contains("scorre") ? `${lista.children.length} file · scorri per vederli tutti` : "");
+  }
+}
+window.addEventListener("resize", segnaScorrimento);
 function disegnaCampi() {
   firmaMateriali = JSON.stringify([Object.keys(RUOLI).map(elementiDi), progetto.scartati, progetto.out, progetto.trascrivi]);
   const info = progetto.info || {};
@@ -597,6 +617,7 @@ function disegnaCampi() {
   const out = $("#percorso-out");
   out.textContent = progetto.out || "verrà proposta accanto al video";
   out.classList.toggle("vuoto", !progetto.out);
+  segnaScorrimento();
 }
 function controlliRuolo(percorso, ruolo) {
   // Per correggere un riconoscimento sbagliato: "usa come…" e togli.
