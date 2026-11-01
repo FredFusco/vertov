@@ -72,5 +72,7 @@ Su M5 Max servono 12–25 secondi per inquadratura, secondo la durata. Per un fi
 ## Aggiornamenti e spazio
 
 - `aggiornamenti.py` controlla Vertov (annuncio all'indirizzo in `aggiornamenti.json`), ffmpeg e Ollama (Homebrew), le librerie Python dell'ambiente e i modelli (Ollama, Hugging Face). L'app chiede prima di installare; le librerie tornano alla versione precedente se non si caricano più.
-- Per pubblicare una versione nuova: scrivere l'indirizzo in `aggiornamenti.json`, poi `python prepara_aggiornamento.py 1.1.0 "Novità…"` e caricare i due file di `dist/` nello stesso posto.
+- Vertov è pubblicato su GitHub (https://github.com/FredFusco/vertov): ogni versione è una release, e `aggiornamenti.json` punta a `releases/latest/download/vertov.json`.
+- Per pubblicare una versione nuova: `git commit` e `git push`, poi `python prepara_aggiornamento.py 1.1.0 "Novità…" --pubblica`.
+- Su GitHub finiscono solo i file del programma ammessi da `.gitignore`: mai film, audio, documenti o risultati.
 - `pulizia.py` misura e cancella fotogrammi temporanei, registri, cache di pip e modelli non usati (File › Libera spazio…).
