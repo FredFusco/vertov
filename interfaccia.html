@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vertov</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22.5' fill='%232b2a33'/%3E%3Cpath d='M10 65 C29 29 69 29 87 50 C69 71 37 73 23 52' fill='none' stroke='%23f4ede0' stroke-width='9' stroke-linecap='round'/%3E%3Ccircle cx='54' cy='50' r='11' fill='%23d9a441'/%3E%3Ccircle cx='54' cy='50' r='4' fill='%232b2a33'/%3E%3C/svg%3E">
+<style>
+:root {
+  --carta: #f4ede0;
+  --carta-2: #ebe3d3;
+  --inchiostro: #2b2a33;
+  --tenue: #6b6670;
+  --linea: #dcd2c0;
+  --rosso: #b5533c;
+  --rosso-scuro: #96432f;
+  --ocra: #d9a441;
+  --ok: #4f7a5a;
+  --avviso: #a8741a;
+  --pannello: #fbf8f2;
+  --ombra: 0 1px 2px rgba(43,42,51,.05), 0 6px 20px rgba(43,42,51,.05);
+  --serif: "Iowan Old Style", "Baskerville", "Palatino", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --carta: #1f1e25; --carta-2: #2b2a33; --inchiostro: #f1eadc; --tenue: #a7a1a9;
+    --linea: #3d3c47; --rosso: #e08a6d; --rosso-scuro: #f0a184; --ocra: #e0b25a; --ok: #8fbf98; --avviso: #e0b25a;
+    --pannello: #26252d; --ombra: 0 6px 24px rgba(0,0,0,.3);
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--carta); color: var(--inchiostro);
+  font: 15px/1.5 -apple-system, "Helvetica Neue", system-ui, sans-serif;
+}
+h2, .schede button { font-family: var(--serif); }
+.tag, .scena { font-family: -apple-system, system-ui, sans-serif; }
+/* testata */
+header { position: relative; border-bottom: 1px solid var(--linea); padding: 18px 16px 0; }
+header::after {  /* perforazioni della pellicola */
+  content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 3px; pointer-events: none;
+  background: repeating-linear-gradient(90deg, var(--ocra) 0 5px, transparent 5px 13px); opacity: .45;
+}
+.testata { max-width: 1080px; margin: 0 auto; display: flex; gap: 16px; align-items: center; position: relative; z-index: 1; flex-wrap: wrap; }
+.testata > svg { width: 54px; height: 54px; flex: none; }
+/* Titolo pseudo-cirillico: lettere latine in un carattere di gusto russo, con la R rovesciata come una Я. */
+@font-face { font-family: "Rubik Mono One"; src: url(data:font/woff2;base64,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) format("woff2"); font-display: block; }
+.titolo { font-family: "Rubik Mono One", var(--serif); font-size: 34px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; line-height: 1; margin: 0; }
+.titolo .specchio { display: inline-block; transform: scaleX(-1); }
+.sottotitolo { color: var(--tenue); margin: 5px 0 0; font-size: 13.5px; font-family: var(--serif); font-style: italic; }
+/* sessione */
+.sessione { margin-left: auto; display: flex; gap: 6px; align-items: center; position: relative; flex-wrap: wrap; margin-right: 0; }
+@media (max-width: 900px) { .sessione { margin-right: 0; margin-left: 0; width: 100%; } }
+.sessione label { font-size: 12px; color: var(--tenue); font-family: var(--serif); font-style: italic; }
+.sessione input {
+  font: 600 14px/1.2 -apple-system, system-ui, sans-serif; padding: 5px 8px; width: 220px; max-width: 50vw;
+  background: var(--pannello); color: var(--inchiostro); border: 1px solid var(--linea); border-radius: 8px;
+}
+.esito-sessione { font-size: 12px; color: var(--ok); min-width: 4em; }
+.elenco-sessioni {
+  position: absolute; right: 0; top: calc(100% + 6px); width: min(420px, 92vw); max-height: 360px; overflow: auto;
+  background: var(--pannello); border: 1px solid var(--linea); border-radius: 10px; box-shadow: 0 10px 30px rgba(43,42,51,.16); z-index: 20;
+}
+.elenco-sessioni button {
+  display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--linea);
+  padding: 9px 12px; color: var(--inchiostro); font: inherit; cursor: pointer;
+}
+.elenco-sessioni button:hover { background: var(--carta-2); }
+.riga-sessione { display: flex; border-bottom: 1px solid var(--linea); }
+.riga-sessione > button:first-child { border-bottom: 0; flex: 1; min-width: 0; }
+.elenco-sessioni button.elimina { width: auto; flex: none; border-bottom: 0; font-size: 12px; color: var(--tenue); padding: 9px 12px; }
+.elenco-sessioni button.elimina:hover { color: var(--rosso); }
+.conferma-elimina { padding: 10px 12px; display: grid; gap: 6px; width: 100%; background: var(--carta); }
+.conferma-elimina .n { font-weight: 600; }
+.conferma-elimina .d { font-size: 12px; color: var(--tenue); }
+.sessione .conferma-elimina .spunta { display: flex; gap: 6px; font: 13px/1.4 -apple-system, system-ui, sans-serif; font-style: normal; color: var(--inchiostro); margin: 0; align-items: flex-start; text-align: left; }
+.sessione .conferma-elimina .spunta input { margin-top: 2px; flex: none; width: auto; padding: 0; }
+.conferma-elimina .riga-azioni { margin-top: 2px; }
+.elenco-sessioni .conferma-elimina button { width: auto; display: inline-block; border: 1px solid var(--linea); padding: 4px 10px; }
+.elenco-sessioni .conferma-elimina button.pericolo { background: var(--rosso); border-color: var(--rosso); color: #fff; }
+.elenco-sessioni button.attuale { box-shadow: inset 3px 0 0 var(--ocra); }
+.elenco-sessioni .n { font-weight: 600; }
+.elenco-sessioni .d { display: block; font-size: 12px; color: var(--tenue); }
+/* schede */
+nav.schede { max-width: 1080px; margin: 14px auto 0; display: flex; gap: 2px; position: relative; z-index: 1; overflow-x: auto; }
+.schede button {
+  appearance: none; border: 1px solid transparent; border-bottom: 0; background: transparent; color: var(--tenue);
+  font-size: 17px; font-weight: 500; padding: 8px 18px 7px; margin-bottom: -1px;
+  cursor: pointer; white-space: nowrap; display: flex; align-items: baseline; gap: 8px; border-radius: 10px 10px 0 0;
+}
+.schede button:hover { color: var(--inchiostro); }
+.schede button .numero { color: var(--ocra); font-size: 18px; font-style: italic; }
+.schede button[aria-selected="true"] { background: var(--carta); color: var(--inchiostro); border-color: var(--linea); }
+.schede button .in-corso { width: 7px; height: 7px; border-radius: 50%; background: var(--ocra); align-self: center; animation: pulsa 1.2s infinite; }
+@keyframes pulsa { 50% { opacity: .25; } }
+main { max-width: 1080px; margin: 0 auto; padding: 4px 16px 64px; }
+.prerequisiti { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--tenue); margin: 14px 0 0; }
+.pallino { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--avviso); vertical-align: 1px; }
+.pallino.ok { background: var(--ok); }
+section.passo {
+  background: var(--pannello); border: 1px solid var(--linea); border-radius: 14px; box-shadow: var(--ombra);
+  margin-top: 18px; padding: 20px 22px 22px; position: relative;
+}
+h2 { margin: 0 0 6px; font-size: 23px; font-weight: 500; }
+.spiega { color: var(--tenue); margin: 0 0 14px; font-size: 14px; max-width: 72ch; }
+.campi { display: grid; grid-template-columns: 1fr; gap: 0; border-top: 1px solid var(--linea); }
+.gruppo-campi { font-size: 15px; font-family: var(--serif); font-style: italic; color: var(--rosso); padding: 14px 0 4px; border-bottom: 1px solid var(--linea); }
+.campo { display: grid; grid-template-columns: 190px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--linea); }
+.campo .etichetta { font-weight: 600; font-size: 14px; }
+.campo .etichetta small { display: block; font-weight: 400; color: var(--tenue); font-size: 12px; }
+.percorso { font: 12.5px/1.3 ui-monospace, "SF Mono", Menlo, monospace; color: var(--tenue); overflow-wrap: anywhere; min-width: 0; }
+.percorso.vuoto { font-family: inherit; font-style: italic; font-size: 13px; }
+.azioni-campo { display: flex; gap: 6px; }
+@media (max-width: 640px) {
+  .campo { grid-template-columns: 1fr auto; }
+  .campo .percorso { grid-column: 1 / -1; grid-row: 2; }
+}
+.bottone {
+  appearance: none; border: 1px solid var(--linea); background: var(--pannello); color: var(--inchiostro);
+  font: 500 14px/1.2 -apple-system, system-ui, sans-serif;
+  padding: 8px 14px; cursor: pointer; border-radius: 8px; transition: background .15s, border-color .15s;
+}
+.bottone:hover { background: var(--carta-2); border-color: var(--tenue); }
+.bottone.primario { background: var(--inchiostro); border-color: var(--inchiostro); color: var(--carta); font-size: 15px; padding: 10px 20px; }
+.bottone.primario:hover { background: var(--rosso); border-color: var(--rosso); }
+.bottone.piccolo { font-size: 12.5px; padding: 4px 10px; border-radius: 6px; }
+.bottone:disabled { opacity: .4; cursor: default; }
+.bottone:focus-visible, input:focus-visible, textarea:focus-visible, .schede button:focus-visible { outline: 2px solid var(--ocra); outline-offset: 2px; }
+.riga-azioni { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.avanti { display: flex; justify-content: flex-end; margin-top: 18px; }
+.spunta { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-top: 10px; }
+textarea {
+  width: 100%; min-height: 120px; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  background: var(--carta); color: var(--inchiostro); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; resize: vertical;
+}
+.avviso { color: var(--rosso); font-size: 14px; font-style: italic; min-height: 1.4em; margin-top: 8px; }
+/* avanzamento */
+.fasi { display: grid; gap: 10px; margin-top: 14px; }
+.fase { display: grid; grid-template-columns: 200px 1fr 150px; gap: 12px; align-items: center; font-size: 14px; }
+.fase .nome { font-weight: 600; }
+.barra { height: 8px; border-radius: 4px; background: var(--carta-2); position: relative; overflow: hidden; }
+.barra > div { position: absolute; inset: 0 auto 0 0; background: var(--tenue); width: 0; transition: width .4s; border-radius: 4px; }
+.fase.corrente .barra > div { background: var(--ocra); }
+.fase .cifre { font-variant-numeric: tabular-nums; color: var(--tenue); font-size: 13px; text-align: right; }
+@media (max-width: 640px) { .fase { grid-template-columns: 1fr; gap: 4px; } .fase .cifre { text-align: left; } }
+details.log { margin-top: 14px; }
+details.log summary { cursor: pointer; color: var(--tenue); font-size: 13px; }
+details.log pre { max-height: 240px; overflow: auto; background: var(--carta); border: 1px solid var(--linea); border-radius: 8px; padding: 10px; font-size: 12px; margin: 8px 0 0; white-space: pre-wrap; }
+/* volti */
+.gruppi { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 12px; }
+.gruppo { border: 1px solid var(--linea); background: var(--carta); padding: 10px; border-radius: 10px; }
+.gruppo.senza { border-color: var(--rosso); }
+.facce { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+.facce figure { margin: 0; flex: none; }
+.facce img { height: 84px; width: auto; display: block; background: var(--carta-2); border-radius: 4px; }
+.facce figcaption { font-size: 10.5px; color: var(--tenue); }
+.gruppo .intest { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; }
+.gruppo .codice { font-weight: 700; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.tag { font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
+.tag.confermato { color: var(--ok); } .tag.proposto { color: var(--avviso); } .tag.senza-nome { color: var(--rosso); }
+.gruppo .info { font-size: 12px; color: var(--tenue); margin: 4px 0 8px; }
+.gruppo input {
+  width: 100%; font: inherit; padding: 6px 8px; background: var(--pannello); color: var(--inchiostro);
+  border: 1px solid var(--linea); border-radius: 6px;
+}
+/* risultati */
+.tabella { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13.5px; }
+.tabella th { text-align: left; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 14px; color: var(--tenue); border-bottom: 1px solid var(--tenue); padding: 6px 8px; position: sticky; top: 0; background: var(--pannello); z-index: 1; }
+.tabella td { border-bottom: 1px solid var(--linea); padding: 8px; vertical-align: top; }
+.tabella td.n { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--tenue); font-size: 12px; }
+.tabella .persone { font-size: 12px; color: var(--tenue); }
+.tabella .parlato { font-size: 12.5px; margin-top: 5px; padding-left: 9px; border-left: 2px solid var(--ocra); font-style: italic; }
+.tabella tr.aggiorna td { opacity: .45; }
+.tabella tr.aggiorna td.desc::before { content: "In aggiornamento…"; display: block; color: var(--rosso); font-weight: 600; font-size: 12px; opacity: 1; }
+.tabella tr.in-correzione td { background: var(--carta); }
+.tabella .metadati { font-size: 11.5px; color: var(--tenue); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.tabella .marker { font-size: 12px; margin-top: 4px; padding: 2px 8px; border-radius: 6px; background: color-mix(in srgb, var(--ocra) 18%, transparent); display: inline-block; }
+.tabella .marker::before { content: "Marker · "; color: var(--tenue); }
+.tag.corretta { color: var(--ok); margin-left: 6px; }
+.scena { display: inline-block; min-width: 2.4em; text-align: center; font-weight: 600; font-size: 13px; background: var(--carta-2); color: var(--inchiostro); padding: 2px 7px; border-radius: 10px; }
+.contenitore-tabella { overflow: auto; max-height: calc(100vh - 260px); min-height: 300px; }
+.vuoto-msg { color: var(--tenue); font-style: italic; font-size: 14px; margin-top: 10px; }
+.correzione textarea { min-height: 90px; font: 14px/1.5 -apple-system, system-ui, sans-serif; background: var(--pannello); border: 1px solid var(--ocra); border-radius: 8px; }
+.correzione .nota { font-size: 12.5px; color: var(--tenue); margin: 4px 0 8px; }
+.azioni-riga { margin-top: 6px; }
+
+/* materiali: riquadri di trascinamento */
+.zone { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .zone { grid-template-columns: 1fr; } }
+.zona { border: 1.5px dashed var(--linea); border-radius: 12px; padding: 14px; min-height: 220px; display: flex; flex-direction: column; gap: 10px; background: var(--carta); transition: border-color .15s, background .15s; }
+.zona.piena { border-style: solid; background: var(--pannello); }
+body.trascinando .zona { border-color: var(--ocra); border-style: dashed; background: color-mix(in srgb, var(--ocra) 8%, var(--carta)); }
+.zona-testa h3 { margin: 0; font: 500 20px/1.2 var(--serif); }
+.zona-testa span { font-size: 12.5px; color: var(--tenue); }
+.zona .invito { margin-top: auto; text-align: center; color: var(--tenue); font: italic 15px/1.6 var(--serif); padding: 18px 6px; }
+.zona.piena .invito { padding: 6px; font-size: 13px; }
+.zona .invito .bottone { margin-top: 6px; }
+.elementi { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.elemento { border: 1px solid var(--linea); border-radius: 8px; padding: 8px 10px; background: var(--carta); }
+.riga-el { display: flex; flex-direction: column; gap: 1px; }
+.elemento .ruolo { font: italic 13px/1.2 var(--serif); color: var(--rosso); }
+.nome-file { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.elemento .dettaglio, .scartato .dettaglio { font-size: 12px; color: var(--tenue); }
+.elemento .uso { font-size: 12px; color: var(--inchiostro); margin-top: 2px; }
+.controlli { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+.controlli select { font: 12px -apple-system, system-ui, sans-serif; padding: 3px 6px; border: 1px solid var(--linea); border-radius: 6px; background: var(--pannello); color: var(--inchiostro); max-width: 150px; }
+.elemento.mancante { border-color: var(--rosso); }
+.avviso-file { font-size: 12px; color: var(--rosso); margin-top: 3px; }
+.mancanti { font-size: 12px; color: var(--avviso); font-style: italic; display: grid; gap: 2px; }
+.esito-arrivo { font-size: 13.5px; margin-top: 12px; min-height: 1.4em; color: var(--ok); }
+.esito-arrivo.attesa { color: var(--avviso); font-style: italic; }
+.scartati { display: grid; gap: 8px; margin-top: 8px; }
+.scartato { border: 1px dashed var(--rosso); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; }
+.cartella-risultati { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13.5px; color: var(--tenue); }
+
+/* avvio dalla scheda Materiali */
+.avvio { display: flex; gap: 18px; align-items: center; justify-content: space-between; margin-top: 18px; padding: 16px; border-radius: 12px; background: var(--carta); border: 1px solid var(--linea); flex-wrap: wrap; }
+.avvio > div { flex: 1; min-width: 260px; font-size: 13.5px; color: var(--tenue); }
+.avvio b { color: var(--inchiostro); font-family: var(--serif); font-size: 16px; font-weight: 500; margin-right: 4px; }
+.bottone.grande { font-size: 17px; padding: 12px 26px; }
+.esporta { margin-top: 10px; }
+.etichetta-esporta { font: italic 14px var(--serif); color: var(--tenue); }
+.avviso-volti { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--ocra) 14%, var(--pannello)); font-size: 13.5px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+/* finestra dei volti */
+.velo { position: fixed; inset: 0; background: rgba(31, 30, 37, .45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.foglio { background: var(--pannello); border: 1px solid var(--linea); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(1100px, 100%); max-height: 100%; display: flex; flex-direction: column; }
+.foglio-testa { padding: 18px 22px 4px; border-bottom: 1px solid var(--linea); }
+.foglio-corpo { padding: 4px 22px 18px; overflow: auto; flex: 1; }
+.foglio-piede { display: flex; gap: 10px; justify-content: flex-end; align-items: center; padding: 12px 22px; border-top: 1px solid var(--linea); }
+.esito-nomi { margin-right: auto; font-size: 13px; color: var(--tenue); font-style: italic; }
+.schede-personaggi { margin-top: 18px; }
+.schede-personaggi summary { cursor: pointer; font: 500 16px var(--serif); }
+.gruppo.cambiato { border-color: var(--ocra); box-shadow: 0 0 0 1px var(--ocra); }
+/* finestra degli aggiornamenti */
+#finestra-aggiornamenti .foglio { width: min(560px, 100%); }
+.novita-voce { display: flex; gap: 10px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--linea); }
+.novita-voce:last-child { border-bottom: 0; }
+.novita-voce input { margin-top: 4px; }
+.novita-voce b { font: 500 16px var(--serif); }
+.novita-voce ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--tenue); }
+.agg-avanzamento { margin-top: 12px; font-size: 13px; color: var(--tenue); }
+.agg-avanzamento .barra > div { background: var(--ocra); }
+.riga-stato { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 0; }
+.riga-stato .prerequisiti { margin: 0; }
+.riga-stato .strumenti { margin-left: auto; display: flex; gap: 8px; }
+.gruppo-agg { font: italic 14px var(--serif); color: var(--tenue); margin: 14px 0 0; }
+.novita-voce .versioni { font: 12.5px ui-monospace, Menlo, monospace; color: var(--tenue); }
+.pulizia-voce .peso { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 14px; }
+.pulizia-totale { margin-right: auto; font-size: 13.5px; color: var(--tenue); }
+.agg-automatico { font-size: 13px; color: var(--tenue); margin-right: auto; display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="testata">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <rect width="100" height="100" rx="22.5" fill="#2b2a33"/>
+      <path d="M10 65 C29 29 69 29 87 50 C69 71 37 73 23 52" fill="none" stroke="#f4ede0" stroke-width="7" stroke-linecap="round"/>
+      <path d="M10 65 C29 29 69 29 87 50 C69 71 37 73 23 52" fill="none" stroke="#2b2a33" stroke-width="2" stroke-dasharray="2 4"/>
+      <circle cx="54" cy="50" r="9" fill="#d9a441"/>
+      <circle cx="54" cy="50" r="3.5" fill="#2b2a33"/>
+    </svg>
+    <div>
+      <h1 class="titolo" aria-label="Vertov"><span aria-hidden="true">VE<span class="specchio">R</span>TOV</span></h1>
+      <p class="sottotitolo">Il cine-occhio che descrive ogni inquadratura del tuo film</p>
+    </div>
+    <div class="sessione">
+      <label for="nome-sessione">Sessione</label>
+      <input id="nome-sessione" spellcheck="false" aria-label="Nome della sessione">
+      <button class="bottone piccolo" id="salva-sessione">Salva</button>
+      <button class="bottone piccolo" id="nuova-sessione">Nuova</button>
+      <button class="bottone piccolo" id="apri-sessione" aria-haspopup="true" aria-expanded="false">Apri…</button>
+      <span class="esito-sessione" id="esito-sessione"></span>
+      <div class="elenco-sessioni" id="elenco-sessioni" hidden></div>
+    </div>
+  </div>
+  <nav class="schede" role="tablist">
+    <button role="tab" data-scheda="materiali" aria-selected="true"><span class="numero">1</span> Materiali</button>
+    <button role="tab" data-scheda="risultato" aria-selected="false"><span class="numero">2</span> Risultato <span class="in-corso" hidden></span></button>
+  </nav>
+</header>
+
+<main>
+  <!-- 1 · MATERIALI -->
+  <div role="tabpanel" id="scheda-materiali">
+    <div class="riga-stato">
+      <div class="prerequisiti" id="prerequisiti"></div>
+      <span class="strumenti"><button class="bottone piccolo" data-comando="aggiornamenti">Aggiornamenti…</button>
+      <button class="bottone piccolo" data-comando="pulizia">Libera spazio…</button></span>
+    </div>
+    <section class="passo">
+      <h2>Materiali del film</h2>
+      <p class="spiega">Trascina qui i file, anche tutti insieme o un'intera cartella: Vertov riconosce da solo cosa sono e come usarli. Serve solo il video; tutto il resto migliora le descrizioni. I file non vengono copiati né inviati da nessuna parte.</p>
+      <div class="zone" id="campi">
+        <div class="zona" data-zona="video">
+          <div class="zona-testa"><h3>Video</h3><span>il film montato e l'EDL o l'AAF della timeline</span></div>
+          <ul class="elementi"></ul>
+          <div class="invito">Trascina qui il video<br><button class="bottone piccolo" data-sfoglia="file">oppure scegli i file…</button></div>
+          <div class="mancanti"></div>
+        </div>
+        <div class="zona" data-zona="audio">
+          <div class="zona-testa"><h3>Audio</h3><span>stem dialoghi, effetti, musica o il mix</span></div>
+          <ul class="elementi"></ul>
+          <div class="invito">Trascina qui le tracce audio<br><button class="bottone piccolo" data-sfoglia="file">oppure scegli i file…</button></div>
+          <div class="mancanti"></div>
+        </div>
+        <div class="zona" data-zona="documenti">
+          <div class="zona-testa"><h3>Documenti</h3><span>sceneggiatura, trascrizione, ordini del giorno, schede</span></div>
+          <ul class="elementi"></ul>
+          <div class="invito">Trascina qui i documenti<br><button class="bottone piccolo" data-sfoglia="file">scegli i file…</button> <button class="bottone piccolo" data-sfoglia="cartella">una cartella…</button></div>
+          <div class="mancanti"></div>
+        </div>
+      </div>
+      <div class="esito-arrivo" id="esito-arrivo" aria-live="polite"></div>
+      <div class="scartati" id="scartati"></div>
+      <label class="spunta"><input type="checkbox" id="trascrivi"> Senza trascrizione: trascrivi i dialoghi con Whisper</label>
+      <div class="cartella-risultati"><span>I risultati vanno in</span> <span class="percorso" id="percorso-out"></span> <button class="bottone piccolo" id="cambia-out">Cambia…</button></div>
+      <div class="avvio">
+        <div><b>Pronto?</b> Vertov fa tutto da solo: avvia Ollama e scarica il modello se serve, trascrive i dialoghi, riconosce i volti e dà loro un nome, descrive ogni inquadratura e scrive il report. Alla fine potrai controllare i volti, se vuoi.</div>
+        <button class="bottone primario grande" data-comando="descrivi">Descrivi il film</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 3 · RISULTATO -->
+  <div role="tabpanel" id="scheda-risultato" hidden>
+    <section class="passo">
+      <h2>Descrizioni</h2>
+      <p class="spiega">Per un film di circa 2.000 inquadrature servono 7–12 ore. Puoi fermare e riprendere quando vuoi: riparte da dove si era interrotta. Se una descrizione è sbagliata, premi <em>Correggi</em>: la tua correzione viene estesa alle altre inquadrature della stessa scena. Se un personaggio ha il nome sbagliato, usa <em>Controlla i volti</em>.</p>
+      <div class="avviso-volti" id="avviso-volti" hidden></div>
+      <div class="riga-azioni">
+        <button class="bottone primario" id="avvia-descrizioni">Descrivi il film</button>
+        <button class="bottone" id="ferma" disabled>Ferma</button>
+        <span style="flex:1"></span>
+        <button class="bottone" id="apri-volti" disabled title="Disponibile dopo l'analisi">Controlla i volti…</button>
+      </div>
+      <div class="riga-azioni esporta">
+        <span class="etichetta-esporta">Esporta</span>
+        <button class="bottone piccolo" data-comando="report-apri" id="apri-report" disabled>Report</button>
+        <button class="bottone piccolo" data-comando="report-esporta" id="esporta-report" disabled>Salva il report…</button>
+        <button class="bottone piccolo" data-apri="csv">Foglio di calcolo</button>
+        <button class="bottone piccolo" data-apri="resolve" title="In Resolve: Timeline › Import › Timeline Markers from EDL">Marker per Resolve</button>
+        <button class="bottone piccolo" data-apri="cartella">Cartella</button>
+      </div>
+      <div class="avviso" id="avviso"></div>
+      <div class="fasi" id="fasi"></div>
+      <details class="log"><summary>Dettagli dell'elaborazione</summary><pre id="log"></pre></details>
+      <div class="contenitore-tabella"><table class="tabella" id="risultati"></table></div>
+    </section>
+  </div>
+</main>
+
+<!-- Finestra dei volti (facoltativa, dopo l'analisi) -->
+<div class="velo" id="finestra-volti" hidden role="dialog" aria-modal="true" aria-labelledby="titolo-volti">
+  <div class="foglio">
+    <div class="foglio-testa">
+      <h2 id="titolo-volti">Controlla i volti</h2>
+      <p class="spiega">Ogni riquadro è una persona trovata nel film, con il nome che Vertov le ha dato. Correggi i nomi sbagliati: più riquadri possono avere lo stesso nome (la stessa persona con luci diverse). Scrivi <em>comparsa</em> per chi non è un personaggio, o lascia vuoto. Con <em>Applica</em> le inquadrature dove compare un nome cambiato vengono ridescritte.</p>
+    </div>
+    <div class="foglio-corpo">
+      <datalist id="nomi-personaggi"></datalist>
+      <div class="gruppi" id="gruppi"></div>
+      <details class="schede-personaggi">
+        <summary>Schede dei personaggi</summary>
+        <p class="spiega">L'aspetto dei personaggi, usato per riconoscerli. Una riga per personaggio: <code>Nome: aspetto</code>. Vale dalla prossima analisi.</p>
+        <textarea id="personaggi" spellcheck="false" placeholder="Luca: ragazzo di circa 18 anni, capelli ricci scuri"></textarea>
+      </details>
+    </div>
+    <div class="foglio-piede">
+      <span id="esito-nomi" class="esito-nomi"></span>
+      <button class="bottone" id="volti-annulla">Annulla</button>
+      <button class="bottone" id="volti-applica" disabled>Applica</button>
+      <button class="bottone primario" id="volti-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Finestra per liberare spazio -->
+<div class="velo" id="finestra-pulizia" hidden role="dialog" aria-modal="true" aria-labelledby="titolo-pulizia">
+  <div class="foglio" style="width:min(600px,100%)">
+    <div class="foglio-testa">
+      <h2 id="titolo-pulizia">Libera spazio</h2>
+      <p class="spiega" id="pulizia-spiega">File temporanei e di cache creati da Vertov. Materiali, risultati e sessioni non vengono toccati.</p>
+    </div>
+    <div class="foglio-corpo"><div id="pulizia-voci"></div></div>
+    <div class="foglio-piede">
+      <span class="pulizia-totale" id="pulizia-totale"></span>
+      <button class="bottone" id="pulizia-annulla">Annulla</button>
+      <button class="bottone primario" id="pulizia-cancella">Cancella</button>
+    </div>
+  </div>
+</div>
+
+<!-- Finestra degli aggiornamenti -->
+<div class="velo" id="finestra-aggiornamenti" hidden role="dialog" aria-modal="true" aria-labelledby="titolo-aggiornamenti">
+  <div class="foglio">
+    <div class="foglio-testa">
+      <h2 id="titolo-aggiornamenti">Aggiornamenti</h2>
+      <p class="spiega" id="agg-spiega"></p>
+    </div>
+    <div class="foglio-corpo">
+      <div id="agg-voci"></div>
+      <div class="agg-avanzamento" id="agg-avanzamento" hidden><div id="agg-fase"></div><div class="barra"><div id="agg-barra"></div></div></div>
+    </div>
+    <div class="foglio-piede">
+      <label class="agg-automatico"><input type="checkbox" id="agg-automatico"> Controlla all'avvio</label>
+      <button class="bottone" id="agg-salta" hidden>Salta questa versione</button>
+      <button class="bottone" id="agg-annulla">Più tardi</button>
+      <button class="bottone primario" id="agg-installa">Aggiorna</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Ruoli dei materiali: nome, a cosa serve, riquadro, cosa succede se manca.
+const RUOLI = {
+  video: ["Video del film", "le immagini da descrivere, inquadratura per inquadratura", "video", "Manca il video: è l'unico materiale indispensabile."],
+  edl: ["Montaggio (EDL o AAF)", "i tagli esatti e i nomi clip, da cui si ricava il numero di scena", "video", "Senza EDL o AAF i tagli vengono rilevati automaticamente."],
+  audio_dialoghi: ["Stem dialoghi", "trascrizione e attribuzione delle battute", "audio", ""],
+  audio_sfx: ["Stem effetti", "riconoscimento di rumori e ambienti", "audio", ""],
+  audio_musica: ["Stem musica", "carattere e strumenti della musica", "audio", ""],
+  audio_mix: ["Mix completo", "il sonoro, quando mancano gli stem separati", "audio", ""],
+  sceneggiatura: ["Sceneggiatura", "personaggi, scene e battute del copione", "documenti", "Senza sceneggiatura i personaggi non hanno nome."],
+  dialoghi: ["Trascrizione dialoghi", "le battute pronunciate, con i tempi", "documenti", ""],
+  odg: ["Ordini del giorno", "chi era convocato in ogni scena", "documenti", "Senza ordini del giorno i volti si nominano solo dal copione."],
+  personaggi: ["Schede dei personaggi", "l'aspetto dei personaggi, per riconoscerli", "documenti", ""],
+};
+function elementiDi(ruolo) {
+  if (ruolo === "odg") return [].concat(progetto.odg || []).filter(Boolean);
+  if (ruolo === "personaggi") return progetto.schede || [];
+  return progetto[ruolo] ? [progetto[ruolo]] : [];
+}
+const NOMI_FASI = {
+  ollama: "Avvio di Ollama",
+  modello: "Download del modello (MB)",
+  trascrizione: "Trascrizione dialoghi",
+  fotogrammi: "Fotogrammi",
+  fotogrammi_volti: "Fotogrammi per i volti",
+  volti: "Ricerca dei volti",
+  confronto_volti: "Confronto con le schede",
+  descrizioni: "Descrizioni",
+  report: "Report e sinossi",
+};
+let progetto = {}, ultimoLavoro = null, personaggiCaricati = false, risultati = [], inCorrezione = null;
+
+const $ = s => document.querySelector(s);
+async function api(percorso, dati) {
+  const r = await fetch(percorso, dati === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dati) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.errore || "Errore");
+  return j;
+}
+function testo(el, t) { el.textContent = t; return el; }
+function crea(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t !== undefined) e.textContent = t; return e; }
+function durata(s) {
+  if (s == null || !isFinite(s)) return "";
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`;
+}
+
+/* ---------- schede ---------- */
+function mostraScheda(nome) {
+  document.querySelectorAll("[role=tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.scheda === nome));
+  document.querySelectorAll("[role=tabpanel]").forEach(p => p.hidden = p.id !== "scheda-" + nome);
+  try { localStorage.setItem("vertov-scheda", nome); } catch {}
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("[role=tab]").forEach(b => b.onclick = () => mostraScheda(b.dataset.scheda));
+try { const s = localStorage.getItem("vertov-scheda"); if (s) mostraScheda(s); } catch {}
+
+/* ---------- sessioni ---------- */
+function esitoSessione(t) { testo($("#esito-sessione"), t); setTimeout(() => testo($("#esito-sessione"), ""), 2500); }
+async function cambiaSessione(dati) {
+  try {
+    const r = await api("/api/sessione", dati);
+    caricaSessione(r.progetto);
+    return true;
+  } catch (e) { alert(e.message); return false; }
+}
+function caricaSessione(p) {
+  progetto = p;
+  $("#nome-sessione").value = p.nome || "";
+  personaggiCaricati = false; inCorrezione = null;
+  disegnaCampi();
+  aggiorna(true);
+  caricaVolti(); caricaRisultati();
+}
+$("#salva-sessione").onclick = async () => {
+  if (await cambiaSessione({ azione: "salva", nome: $("#nome-sessione").value })) {
+    if ($("#personaggi").value.trim() && progetto.out) await api("/api/personaggi", { testo: $("#personaggi").value });
+    esitoSessione("Salvata ✓");
+  }
+};
+$("#nome-sessione").onkeydown = e => { if (e.key === "Enter") $("#salva-sessione").click(); };
+$("#nuova-sessione").onclick = async () => {
+  if (await cambiaSessione({ azione: "nuova" })) { mostraScheda("materiali"); $("#nome-sessione").select(); esitoSessione("Nuova sessione"); }
+};
+$("#apri-sessione").onclick = async e => {
+  e.stopPropagation();
+  const box = $("#elenco-sessioni");
+  if (!box.hidden) { box.hidden = true; return; }
+  const { corrente, sessioni } = await api("/api/sessioni");
+  box.replaceChildren();
+  for (const s of sessioni) {
+    const riga = crea("div", "riga-sessione");
+    const b = crea("button", s.id === corrente ? "attuale" : "");
+    b.append(crea("span", "n", s.nome || "Senza nome"),
+      crea("span", "d", [s.video || "nessun video", s.descritte ? `${s.descritte} inquadrature descritte` : "", s.modificata].filter(Boolean).join(" · ")));
+    b.onclick = async () => { box.hidden = true; if (s.id !== corrente && await cambiaSessione({ azione: "apri", id: s.id })) esitoSessione("Aperta"); };
+    const x = crea("button", "elimina", "Elimina");
+    x.setAttribute("aria-label", "Elimina la sessione " + (s.nome || ""));
+    x.onclick = e => { e.stopPropagation(); confermaElimina(riga, s); };  // la riga cambia: il clic non deve chiudere l'elenco
+    riga.append(b, x);
+    box.appendChild(riga);
+  }
+  box.hidden = false;
+  $("#apri-sessione").setAttribute("aria-expanded", "true");
+};
+function confermaElimina(riga, s) {
+  // Conferma dentro l'elenco: i file originali restano dove sono, i risultati solo se scelto.
+  const box = crea("div", "conferma-elimina");
+  box.append(crea("div", "n", `Eliminare «${s.nome || "Senza nome"}»?`),
+    crea("div", "d", "La sessione e i suoi collegamenti ai materiali spariscono da Vertov. Video, audio e documenti originali restano dove sono."));
+  const spunta = crea("label", "spunta");
+  const cb = crea("input"); cb.type = "checkbox";
+  spunta.append(cb, document.createTextNode(s.descritte
+    ? ` Sposta nel Cestino anche i risultati (${s.descritte} descrizioni, volti, correzioni)`
+    : " Sposta nel Cestino anche i risultati di Vertov"));
+  const az = crea("div", "riga-azioni");
+  const ok = crea("button", "bottone piccolo pericolo", "Elimina");
+  const no = crea("button", "bottone piccolo", "Annulla");
+  const esito = crea("div", "d");
+  az.append(ok, no);
+  box.append(spunta, az, esito);
+  riga.replaceChildren(box);
+  no.onclick = e => { e.stopPropagation(); $("#apri-sessione").click(); $("#apri-sessione").click(); };
+  ok.onclick = async e => {
+    e.stopPropagation();
+    try {
+      const r = await api("/api/sessione", { azione: "elimina", id: s.id, risultati: cb.checked });
+      $("#elenco-sessioni").hidden = true;
+      caricaSessione(r.progetto);
+      esitoSessione(r.spostati && r.spostati.length ? "Eliminata, risultati nel Cestino" : "Eliminata");
+    } catch (err) { testo(esito, err.message); }
+  };
+}
+document.addEventListener("click", e => {
+  if (!$("#elenco-sessioni").contains(e.target)) { $("#elenco-sessioni").hidden = true; $("#apri-sessione").setAttribute("aria-expanded", "false"); }
+});
+
+/* ---------- materiali ---------- */
+let firmaMateriali = "", mancanti = [];
+function nomeFile(p) { return p.split("/").filter(Boolean).pop(); }
+function disegnaCampi() {
+  firmaMateriali = JSON.stringify([Object.keys(RUOLI).map(elementiDi), progetto.scartati, progetto.out, progetto.trascrivi]);
+  const info = progetto.info || {};
+  for (const zona of document.querySelectorAll(".zona")) {
+    const lista = zona.querySelector(".elementi");
+    lista.replaceChildren();
+    const ruoliZona = Object.keys(RUOLI).filter(r => RUOLI[r][2] === zona.dataset.zona);
+    for (const ruolo of ruoliZona) for (const percorso of elementiDi(ruolo)) {
+      const li = crea("li", "elemento");
+      const testa = crea("div", "riga-el");
+      testa.append(crea("span", "ruolo", RUOLI[ruolo][0]), crea("span", "nome-file", nomeFile(percorso)));
+      const dett = (info[percorso] || {});
+      const det = crea("div", "dettaglio", [dett.dettaglio, dett.come ? "riconosciuto " + dett.come : ""].filter(Boolean).join(" · "));
+      const uso = crea("div", "uso", "Serve per " + RUOLI[ruolo][1] + ".");
+      li.title = percorso;
+      li.append(testa, det, uso);
+      if (mancanti.includes(percorso)) {
+        li.classList.add("mancante");
+        li.appendChild(crea("div", "avviso-file", "File non trovato: è stato spostato o il disco non è collegato. Trascinalo di nuovo."));
+      }
+      li.appendChild(controlliRuolo(percorso, ruolo));
+      lista.appendChild(li);
+    }
+    zona.classList.toggle("piena", lista.children.length > 0);
+    const boxAvvisi = zona.querySelector(".mancanti");
+    const avvisi = ruoliZona.filter(r => RUOLI[r][3] && !elementiDi(r).length).map(r => RUOLI[r][3]);
+    if (zona.dataset.zona === "audio" && !ruoliZona.some(r => elementiDi(r).length))
+      avvisi.push("Senza tracce audio si usa il sonoro del video.");
+    if (zona.dataset.zona === "documenti" && !progetto.dialoghi && progetto.trascrivi)
+      avvisi.push("Senza trascrizione i dialoghi verranno trascritti con Whisper.");
+    boxAvvisi.replaceChildren(...(lista.children.length ? avvisi : []).map(a => crea("div", "", a)));
+  }
+  const sc = $("#scartati");
+  sc.replaceChildren();
+  for (const x of progetto.scartati || []) {
+    const d = crea("div", "scartato");
+    d.append(crea("span", "nome-file", x.nome || nomeFile(x.percorso)), crea("span", "dettaglio", x.problema || "Non riconosciuto."), controlliRuolo(x.percorso, ""));
+    sc.appendChild(d);
+  }
+  $("#trascrivi").checked = !!progetto.trascrivi;
+  const out = $("#percorso-out");
+  out.textContent = progetto.out || "verrà proposta accanto al video";
+  out.classList.toggle("vuoto", !progetto.out);
+}
+function controlliRuolo(percorso, ruolo) {
+  // Per correggere un riconoscimento sbagliato: "usa come…" e togli.
+  const box = crea("div", "controlli");
+  const sel = crea("select");
+  sel.setAttribute("aria-label", "Usa " + nomeFile(percorso) + " come");
+  sel.appendChild(new Option(ruolo ? "Usa come…" : "Usa come…", ""));
+  for (const [r, v] of Object.entries(RUOLI)) if (r !== ruolo) sel.appendChild(new Option(v[0], r));
+  sel.onchange = () => cambiaRuolo(percorso, sel.value);
+  const x = crea("button", "bottone piccolo", "Togli");
+  x.setAttribute("aria-label", "Togli " + nomeFile(percorso));
+  x.onclick = () => cambiaRuolo(percorso, "");
+  box.append(sel, x);
+  return box;
+}
+async function cambiaRuolo(percorso, ruolo) {
+  const r = await api("/api/ruolo", { percorso, ruolo });
+  progetto = r.progetto;
+  if (ruolo === "personaggi") personaggiCaricati = false;
+  disegnaCampi();
+}
+function materialiInArrivo(n) {
+  document.body.classList.remove("trascinando");
+  testo($("#esito-arrivo"), `Riconosco ${n === 1 ? "il file" : n + " file"}…`);
+  $("#esito-arrivo").className = "esito-arrivo attesa";
+}
+async function materialiAggiunti(esiti) {
+  const presi = esiti.filter(e => e.ruolo), scartati = esiti.filter(e => !e.ruolo);
+  const parti = [];
+  if (presi.length) parti.push(presi.map(e => `${e.nome} → ${RUOLI[e.ruolo][0].toLowerCase()}`).join(" · "));
+  if (scartati.length) parti.push(`${scartati.length} non ${scartati.length === 1 ? "usato" : "usati"}: vedi sotto`);
+  testo($("#esito-arrivo"), parti.join("  —  ") || "Nessun file da aggiungere.");
+  $("#esito-arrivo").className = "esito-arrivo";
+  if (presi.some(e => e.ruolo === "personaggi")) personaggiCaricati = false;
+  const outPrima = progetto.out;
+  await aggiorna(true);
+  disegnaCampi();
+  if (progetto.out !== outPrima) { caricaVolti(); caricaRisultati(); }
+}
+document.querySelectorAll("[data-sfoglia]").forEach(b => b.onclick = async () => {
+  try {
+    const r = await api("/api/sfoglia", { tipo: b.dataset.sfoglia });
+    if (r.esiti.length) materialiAggiunti(r.esiti);
+  } catch (e) { testo($("#esito-arrivo"), e.message); }
+});
+$("#cambia-out").onclick = async () => {
+  const { percorso } = await api("/api/scegli", { tipo: "cartella", messaggio: "Cartella dei risultati" });
+  if (!percorso) return;
+  const r = await api("/api/progetto", { out: percorso });
+  progetto = r.progetto; personaggiCaricati = false;
+  disegnaCampi(); aggiorna(true); caricaVolti(); caricaRisultati();
+};
+// Evidenzia i riquadri mentre si trascina un file sulla finestra.
+let contaTrascina = 0;
+document.addEventListener("dragenter", e => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { contaTrascina++; document.body.classList.add("trascinando"); } });
+document.addEventListener("dragleave", () => { if (--contaTrascina <= 0) { contaTrascina = 0; document.body.classList.remove("trascinando"); } });
+document.addEventListener("drop", () => { contaTrascina = 0; document.body.classList.remove("trascinando"); mostraScheda("materiali"); });
+$("#trascrivi").onchange = e => api("/api/progetto", { trascrivi: e.target.checked });
+
+/* ---------- finestra dei volti ---------- */
+let gruppiVolti = [], nomiApplicati = {}, schedeApplicate = "";
+async function caricaVolti() {
+  gruppiVolti = await api("/api/volti");
+  nomiApplicati = Object.fromEntries(gruppiVolti.map(g => [g.gruppo, g.nome || ""]));
+  disegnaVolti();
+}
+function disegnaVolti() {
+  const box = $("#gruppi");
+  box.replaceChildren();
+  const nomi = new Set(["comparsa"]);
+  for (const r of ($("#personaggi").value || "").split("\n")) if (r.includes(":") && !r.trim().startsWith("#")) nomi.add(r.split(":")[0].trim());
+  for (const g of gruppiVolti) if (g.nome) nomi.add(g.nome);
+  $("#nomi-personaggi").replaceChildren(...[...nomi].sort().map(n => { const o = document.createElement("option"); o.value = n; return o; }));
+  // Prima le persone senza nome o con nome solo proposto: sono quelle da guardare.
+  const ordinati = [...gruppiVolti].sort((x, y) => (x.confermato - y.confermato) || (y.volti - x.volti));
+  for (const g of ordinati) {
+    const card = crea("div", "gruppo" + (g.nome ? "" : " senza"));
+    const intest = crea("div", "intest");
+    intest.append(crea("span", "codice", g.gruppo),
+      crea("span", "tag " + (g.confermato ? "confermato" : g.nome ? "proposto" : "senza-nome"),
+        g.confermato ? "confermato" : g.nome ? "proposto da Vertov" : "senza nome"));
+    const facce = crea("div", "facce");
+    for (const im of g.immagini) {
+      const f = crea("figure");
+      const img = crea("img"); img.loading = "lazy"; img.alt = `Volto ${g.gruppo}, inquadratura ${im.inquadratura}`;
+      img.src = "/img?p=" + encodeURIComponent(im.file) + "&t=" + Date.now();
+      f.append(img, crea("figcaption", "", "inq. " + im.inquadratura));
+      facce.appendChild(f);
+    }
+    const inq = g.inquadrature.length > 12 ? g.inquadrature.slice(0, 12).join(", ") + "…" : g.inquadrature.join(", ");
+    const info = crea("div", "info", `${g.volti} volti · inquadrature ${inq}`);
+    const input = crea("input"); input.value = g.nome; input.dataset.gruppo = g.gruppo;
+    input.setAttribute("list", "nomi-personaggi"); input.placeholder = "nome, comparsa, o vuoto";
+    input.setAttribute("aria-label", "Nome per " + g.gruppo);
+    input.oninput = () => { card.classList.toggle("cambiato", input.value.trim() !== (nomiApplicati[g.gruppo] || "")); statoVolti(); };
+    card.append(intest, facce, info, input);
+    box.appendChild(card);
+  }
+}
+function nomiInseriti() {
+  const nomi = {};
+  document.querySelectorAll("#gruppi input").forEach(i => nomi[i.dataset.gruppo] = i.value.trim());
+  return nomi;
+}
+function modificheVolti() {
+  const nomi = nomiInseriti();
+  return Object.keys(nomi).filter(g => nomi[g] !== (nomiApplicati[g] || "")).length + ($("#personaggi").value !== schedeApplicate ? 1 : 0);
+}
+function statoVolti() {
+  const n = modificheVolti();
+  $("#volti-applica").disabled = n === 0 || (ultimoLavoro && ultimoLavoro.attivo);
+}
+$("#personaggi").oninput = statoVolti;
+async function apriVolti() {
+  if ($("#apri-volti").disabled) return;
+  await caricaVolti();
+  schedeApplicate = $("#personaggi").value;
+  testo($("#esito-nomi"), "");
+  $("#finestra-volti").hidden = false;
+  statoVolti();
+  const primo = $("#gruppi input"); if (primo) primo.focus();
+}
+function chiudiVolti() { $("#finestra-volti").hidden = true; }
+async function applicaVolti() {
+  // Nomi confermati e schede salvate; le inquadrature con un nome cambiato vengono ridescritte.
+  if (!modificheVolti()) return true;
+  try {
+    if ($("#personaggi").value !== schedeApplicate) {
+      await api("/api/personaggi", { testo: $("#personaggi").value });
+      schedeApplicate = $("#personaggi").value;
+    }
+    const r = await api("/api/nomi", { nomi: nomiInseriti() });
+    await caricaVolti();
+    testo($("#esito-nomi"), r.inquadrature.length
+      ? `Applicato: aggiorno ${r.inquadrature.length === 1 ? "1 inquadratura" : r.inquadrature.length + " inquadrature"} con i nomi nuovi.` : "Applicato.");
+    aggiorna(true);
+    statoVolti();
+    return true;
+  } catch (e) { testo($("#esito-nomi"), e.message); return false; }
+}
+$("#apri-volti").onclick = apriVolti;
+$("#volti-annulla").onclick = chiudiVolti;
+$("#volti-applica").onclick = applicaVolti;
+$("#volti-ok").onclick = async () => { if (await applicaVolti()) chiudiVolti(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#finestra-volti").hidden) chiudiVolti(); });
+
+/* ---------- comandi (pulsanti e menu della barra di macOS) ---------- */
+async function vertovComando(nome) {
+  const clic = sel => { const b = $(sel); if (b && !b.disabled) b.click(); };
+  try {
+    switch (nome) {
+      case "nuova": return clic("#nuova-sessione");
+      case "apri": { const box = $("#elenco-sessioni"); if (box.hidden) clic("#apri-sessione"); return; }
+      case "salva": return clic("#salva-sessione");
+      case "elimina": {
+        if ($("#elenco-sessioni").hidden) $("#apri-sessione").click();
+        await new Promise(r => setTimeout(r, 400));
+        const riga = [...document.querySelectorAll(".riga-sessione")].find(x => x.querySelector(".attuale"));
+        if (riga) riga.querySelector(".elimina").click();
+        return;
+      }
+      case "aggiungi-file": mostraScheda("materiali"); return clic('[data-sfoglia="file"]');
+      case "aggiungi-cartella": mostraScheda("materiali"); return clic('[data-sfoglia="cartella"]');
+      case "report-apri": await api("/api/report", {}); return;
+      case "report-esporta": { const r = await api("/api/report", { azione: "esporta" }); if (r.percorso) testo($("#avviso"), "Report salvato in " + r.percorso); return; }
+      case "csv": case "resolve": case "cartella": await api("/api/apri", { cosa: nome }); return;
+      case "vista-materiali": return mostraScheda("materiali");
+      case "vista-risultato": return mostraScheda("risultato");
+      case "dettagli": mostraScheda("risultato"); document.querySelector("details.log").open = true; return;
+      case "volti": mostraScheda("risultato"); return apriVolti();
+      case "aggiornamenti": return cercaAggiornamenti(true);
+      case "pulizia": return apriPulizia();
+      case "descrivi": return avvia("descrizioni");
+      case "ferma": return clic("#ferma");
+    }
+  } catch (e) { mostraScheda("risultato"); testo($("#avviso"), e.message); }
+}
+document.querySelectorAll("[data-comando]").forEach(b => b.onclick = () => vertovComando(b.dataset.comando));
+
+/* ---------- risultato ---------- */
+function chiaveScena(r) { return r.scena || r.numero_scena || ""; }
+
+async function caricaRisultati() {
+  risultati = await api("/api/risultati");
+  disegnaRisultati();
+}
+function disegnaRisultati() {
+  if (inCorrezione !== null) return;  // non si ridisegna mentre l'utente scrive una correzione
+  const t = $("#risultati");
+  t.replaceChildren();
+  if (!risultati.length) { const tr = crea("tr"); tr.appendChild(crea("td", "vuoto-msg", "Ancora nessuna inquadratura descritta.")); t.appendChild(tr); return; }
+  const th = crea("tr");
+  for (const h of ["N.", "Scena", "Timecode", "Piano", "Descrizione"]) th.appendChild(crea("th", "", h));
+  t.appendChild(th);
+  const inAggiornamento = new Set(ultimoLavoro && ultimoLavoro.attivo && ["correzione", "volti"].includes(ultimoLavoro.tipo) ? ultimoLavoro.rifai : []);
+  for (const r of risultati) {
+    const tr = crea("tr", inAggiornamento.has(r.numero) ? "aggiorna" : "");
+    tr.appendChild(crea("td", "n", r.numero));
+    const sc = crea("td");
+    if (r.numero_scena) { const b = crea("span", "scena", r.numero_scena); b.title = r.scena || ""; sc.appendChild(b); }
+    tr.appendChild(sc);
+    tr.appendChild(crea("td", "n", r.tc_in));
+    const piano = crea("td", "", r.piano || "");
+    piano.appendChild(crea("div", "persone", r.movimento_macchina || ""));
+    const m = r.montaggio || {};
+    // Dati dall'AAF: ciak, camera e focale, effetti.
+    const ciak = m.scena ? [m.scena, m.inquadratura, m.ciak].filter(Boolean).join("/") : "";
+    const ripresa = [ciak && "ciak " + ciak, (m.camera || "").replace(/[_ ]+$/, "") && "cam " + m.camera.replace(/[_ ]+$/, ""), m.focale].filter(Boolean).join(" · ");
+    if (ripresa) piano.appendChild(crea("div", "metadati", ripresa));
+    if ((m.effetti || []).length || m.entrata) piano.appendChild(crea("div", "metadati", [m.entrata, ...(m.effetti || [])].filter(Boolean).join(", ")));
+    tr.appendChild(piano);
+    const d = crea("td", "desc");
+    d.appendChild(document.createTextNode(r.descrizione || ""));
+    if (r.corretta) d.appendChild(crea("span", "tag corretta", "corretta"));
+    if (r.dialoghi_riassunto) d.appendChild(crea("div", "parlato", r.dialoghi_riassunto));
+    const pers = (r.personaggi || []).join(", ");
+    if (pers) d.appendChild(crea("div", "persone", pers));
+    if ((m.sovrimpressioni || []).length) d.appendChild(crea("div", "metadati", "In sovrimpressione: " + m.sovrimpressioni.join(", ")));
+    const note = Object.entries(m.note || {}).filter(([k]) => !/^unc/i.test(k));
+    if (note.length) d.appendChild(crea("div", "metadati", "Bin — " + note.map(([k, v]) => `${k}: ${v}`).join(" · ")));
+    for (const mk of m.marker || []) d.appendChild(crea("div", "marker", mk));
+    const az = crea("div", "azioni-riga");
+    const b = crea("button", "bottone piccolo", "Correggi");
+    b.disabled = !!(ultimoLavoro && ultimoLavoro.attivo);
+    b.onclick = () => apriCorrezione(r, d, tr);
+    az.appendChild(b);
+    d.appendChild(az);
+    tr.appendChild(d);
+    t.appendChild(tr);
+  }
+}
+function apriCorrezione(r, cella, tr) {
+  inCorrezione = r.numero;
+  tr.classList.add("in-correzione");
+  const stessaScena = risultati.filter(x => chiaveScena(x) && chiaveScena(x) === chiaveScena(r)).length || 1;
+  const box = crea("div", "correzione");
+  const area = crea("textarea"); area.value = r.descrizione || "";
+  area.setAttribute("aria-label", "Descrizione corretta dell'inquadratura " + r.numero);
+  const nota = crea("div", "nota", stessaScena > 1
+    ? `Riscrivi la descrizione com'è davvero. Vertov la terrà così e aggiornerà di conseguenza le ${stessaScena} inquadrature della scena ${r.numero_scena || ""} (circa ${Math.ceil(stessaScena * 20 / 60)} min).`
+    : "Riscrivi la descrizione com'è davvero. Vertov la terrà così e aggiornerà i campi di questa inquadratura.");
+  const az = crea("div", "riga-azioni");
+  const ok = crea("button", "bottone primario", stessaScena > 1 ? "Applica alla scena" : "Applica");
+  const no = crea("button", "bottone", "Annulla");
+  az.append(ok, no);
+  if (r.corretta) {
+    const togli = crea("button", "bottone piccolo", "Togli la correzione");
+    togli.onclick = () => invia("");
+    az.appendChild(togli);
+  }
+  box.append(area, nota, az);
+  cella.replaceChildren(box);
+  area.focus();
+  no.onclick = () => { inCorrezione = null; disegnaRisultati(); };
+  ok.onclick = () => invia(area.value);
+  async function invia(testoCorretto) {
+    try {
+      await api("/api/correggi", { numero: r.numero, testo: testoCorretto });
+      inCorrezione = null;
+      testo($("#avviso"), "");
+      await aggiorna(true);
+      disegnaRisultati();
+    } catch (e) { testo(nota, e.message); }
+  }
+}
+
+document.querySelectorAll("[data-apri]").forEach(b => b.onclick = async () => {
+  try { await api("/api/apri", { cosa: b.dataset.apri }); } catch (e) { testo($("#avviso"), e.message); }
+});
+
+async function avvia(fase) {
+  mostraScheda("risultato");
+  testo($("#avviso"), "");
+  try { await api("/api/avvia", { fase }); aggiorna(true); }
+  catch (e) { testo($("#avviso"), e.message); }
+}
+$("#avvia-descrizioni").onclick = () => avvia("descrizioni");
+$("#ferma").onclick = () => api("/api/ferma", {});
+
+function disegnaFasi(l) {
+  // L'avanzamento compare nella scheda del lavoro in corso (volti o descrizioni e correzioni).
+  const qui = $("#fasi");
+  qui.replaceChildren();
+  if (l.sessione && l.sessione !== progetto.id) return;
+  const ordine = Object.keys(NOMI_FASI).filter(f => l.avanzamento[f] || l.fase === f);
+  for (const f of ordine) {
+    const a = l.avanzamento[f];
+    const corrente = l.attivo && l.fase === f;
+    const riga = crea("div", "fase" + (corrente ? " corrente" : ""));
+    riga.appendChild(crea("div", "nome", f === "descrizioni" && l.tipo === "correzione" ? "Aggiornamento scena"
+      : f === "descrizioni" && l.tipo === "volti" ? "Aggiornamento dei nomi" : NOMI_FASI[f]));
+    const barra = crea("div", "barra"); const pieno = crea("div");
+    pieno.style.width = a ? (100 * a.fatti / a.totale).toFixed(1) + "%" : (corrente ? "3%" : "0");
+    barra.appendChild(pieno);
+    riga.appendChild(barra);
+    let cifre = a ? `${a.fatti} / ${a.totale}` : (corrente ? "in corso…" : "");
+    if (a && a.eta && corrente) cifre += ` · ~${durata(a.eta)}`;
+    riga.appendChild(crea("div", "cifre", cifre));
+    qui.appendChild(riga);
+  }
+}
+
+let timer = null;
+async function aggiorna(subito) {
+  clearTimeout(timer);
+  let s;
+  try { s = await api("/api/stato"); } catch { timer = setTimeout(aggiorna, 4000); return; }
+  if (s.progetto.id !== progetto.id) {
+    progetto = s.progetto; $("#nome-sessione").value = progetto.nome || ""; personaggiCaricati = false;
+    disegnaCampi(); caricaVolti(); caricaRisultati();
+  }
+  progetto = s.progetto || {};
+  const mancantiPrima = JSON.stringify(mancanti);
+  mancanti = s.mancanti || [];
+  if (JSON.stringify([Object.keys(RUOLI).map(elementiDi), progetto.scartati, progetto.out, progetto.trascrivi]) !== firmaMateriali
+      || JSON.stringify(mancanti) !== mancantiPrima) disegnaCampi();
+  if (!personaggiCaricati) { $("#personaggi").value = s.personaggi || ""; personaggiCaricati = true; }
+  const p = s.prerequisiti;
+  const pr = $("#prerequisiti"); pr.replaceChildren();
+  for (const [ok, t] of [[p.ollama, p.ollama ? "Ollama attivo" : "Ollama non attivo"], [p.modello, p.modello ? "Modello di visione pronto" : "Modello di visione mancante"]]) {
+    const sp = crea("span"); sp.append(crea("span", "pallino" + (ok ? " ok" : "")), t); pr.appendChild(sp);
+  }
+  const l = s.lavoro;
+  for (const b of document.querySelectorAll('#avvia-descrizioni, [data-comando="descrivi"]')) {
+    b.disabled = l.attivo;
+    b.textContent = l.attivo && l.tipo === "descrizioni" ? "In corso…" : "Descrivi il film";
+  }
+  $("#ferma").disabled = !l.attivo;
+  document.querySelector('[data-scheda=risultato] .in-corso').hidden = !l.attivo;
+  // I volti si controllano solo a lavoro finito; il report c'è dopo la prima analisi completa.
+  $("#apri-volti").disabled = !s.volti_pronti || l.attivo;
+  $("#apri-volti").title = s.volti_pronti ? "" : "Disponibile dopo l'analisi";
+  $("#apri-report").disabled = $("#esporta-report").disabled = !s.report_pronto;
+  const avvisoVolti = $("#avviso-volti");
+  avvisoVolti.hidden = !(s.volti_proposti > 0 && !l.attivo);
+  if (!avvisoVolti.hidden && avvisoVolti.dataset.n !== String(s.volti_proposti)) {
+    avvisoVolti.dataset.n = s.volti_proposti;
+    avvisoVolti.replaceChildren(crea("span", "", `Vertov ha dato un nome a ${s.volti_proposti} persone da solo. Se vuoi, controlla che i nomi siano giusti.`));
+    const b = crea("button", "bottone piccolo", "Controlla i volti…"); b.onclick = apriVolti;
+    avvisoVolti.appendChild(b);
+  }
+  disegnaFasi(l);
+  testo($("#log"), l.log.join("\n"));
+  const eraAttivo = ultimoLavoro && ultimoLavoro.attivo;
+  ultimoLavoro = l;
+  if (!l.attivo && eraAttivo) {
+    // Un'elaborazione è appena finita: si aggiornano volti e risultati.
+    caricaVolti(); caricaRisultati();
+    const dove = $("#avviso");
+    if (l.codice && l.codice !== 0 && l.codice !== -15) testo(dove, "L'elaborazione si è interrotta con un errore: guarda i dettagli dell'elaborazione.");
+    else if (l.codice === -15) testo(dove, "Elaborazione fermata. Puoi riprenderla quando vuoi.");
+    else if (l.tipo === "volti") testo(dove, "Descrizioni aggiornate con i nomi dei volti.");
+    else if (l.tipo === "correzione") testo(dove, "Scena aggiornata con la tua correzione.");
+    else if (l.tipo === "descrizioni") testo(dove, "Analisi completata. Il report è pronto: lo trovi in Esporta.");
+    statoVolti();
+  } else if (l.attivo && l.avanzamento.descrizioni) {
+    const n = l.avanzamento.descrizioni.fatti;
+    if (n !== aggiorna.ultimoN) { aggiorna.ultimoN = n; caricaRisultati(); }
+  } else if (subito || !eraAttivo !== !l.attivo) {
+    disegnaRisultati();  // righe in aggiornamento e pulsanti Correggi seguono il lavoro in corso
+  }
+  timer = setTimeout(aggiorna, l.attivo ? 1500 : 4000);
+}
+
+/* ---------- aggiornamenti ---------- */
+const GRUPPI_AGG = { app: "Vertov", programma: "Programmi", libreria: "Librerie Python", modello: "Modelli di intelligenza artificiale" };
+let offerta = null, aggInCorso = false, aggAutomatico = true;
+function chiudiAggiornamenti() { if (!aggInCorso) $("#finestra-aggiornamenti").hidden = true; }
+async function cercaAggiornamenti(manuale) {
+  // All'avvio la finestra compare solo se c'è qualcosa da aggiornare; dal menu sempre.
+  if (manuale) {
+    mostraAggiornamenti("Cerco aggiornamenti di Vertov, dei programmi, delle librerie e dei modelli… (può richiedere un minuto)", []);
+    $("#agg-installa").disabled = true;
+  }
+  let r;
+  try { r = await api("/api/aggiornamenti", { azione: "controlla", manuale }); }
+  catch (e) { if (manuale) mostraAggiornamenti(e.message, []); return; }
+  if (r.da_fare === false) return;
+  offerta = r;
+  if (!r.voci.length && !manuale) return;
+  let spiega;
+  if (r.voci.length) spiega = r.voci.length === 1 ? "È disponibile un aggiornamento. Vuoi installarlo?" : `Sono disponibili ${r.voci.length} aggiornamenti. Vuoi installarli?`;
+  else spiega = `È tutto aggiornato: Vertov ${r.versione}, programmi, librerie e modelli.`;
+  if (r.errori.length) spiega += " Non sono riuscito a controllare: " + r.errori.join("; ") + ".";
+  mostraAggiornamenti(spiega, r.voci);
+  $("#agg-salta").hidden = manuale || !r.voci.length;
+}
+function mostraAggiornamenti(spiega, voci) {
+  testo($("#agg-spiega"), spiega);
+  const box = $("#agg-voci"); box.replaceChildren();
+  for (const [gruppo, titolo] of Object.entries(GRUPPI_AGG)) {
+    const delGruppo = voci.filter(v => v.gruppo === gruppo);
+    if (!delGruppo.length) continue;
+    box.appendChild(crea("div", "gruppo-agg", titolo));
+    for (const v of delGruppo) {
+      const riga = crea("label", "novita-voce");
+      const c = crea("input"); c.type = "checkbox"; c.checked = true; c.dataset.chiave = v.chiave; c.onchange = statoAggiornamenti;
+      const d = crea("div");
+      d.append(crea("b", "", v.nome), " ", crea("span", "versioni", `${v.attuale} → ${v.nuova}`));
+      if (v.descrizione) d.appendChild(crea("div", "spiega", v.descrizione));
+      if (v.novita && v.novita.length) { const ul = crea("ul"); v.novita.forEach(n => ul.appendChild(crea("li", "", n))); d.appendChild(ul); }
+      riga.append(c, d); box.appendChild(riga);
+    }
+  }
+  $("#agg-avanzamento").hidden = true;
+  $("#agg-installa").textContent = voci.length ? "Aggiorna" : "OK";
+  $("#agg-installa").dataset.modo = voci.length ? "installa" : "chiudi";
+  $("#agg-annulla").hidden = !voci.length; $("#agg-annulla").textContent = "Più tardi";
+  $("#agg-salta").hidden = true;
+  $("#agg-automatico").checked = aggAutomatico;
+  $("#finestra-aggiornamenti").hidden = false;
+  statoAggiornamenti();
+}
+function sceltiAggiornamenti() {
+  const chiavi = new Set([...document.querySelectorAll("#agg-voci input:checked")].map(c => c.dataset.chiave));
+  return (offerta?.voci || []).filter(v => chiavi.has(v.chiave));
+}
+function statoAggiornamenti() {
+  $("#agg-installa").disabled = $("#agg-installa").dataset.modo === "installa" && !sceltiAggiornamenti().length;
+}
+api("/api/aggiornamenti").then(r => aggAutomatico = r.automatico).catch(() => {});
+$("#agg-automatico").onchange = e => { aggAutomatico = e.target.checked; api("/api/aggiornamenti", { azione: "automatico", valore: aggAutomatico }); };
+$("#agg-annulla").onclick = chiudiAggiornamenti;
+$("#agg-salta").onclick = async () => { await api("/api/aggiornamenti", { azione: "salta", voci: offerta.voci }); chiudiAggiornamenti(); };
+$("#agg-installa").onclick = async () => {
+  const modo = $("#agg-installa").dataset.modo;
+  if (modo === "chiudi") return chiudiAggiornamenti();
+  if (modo === "riavvia") { testo($("#agg-fase"), "Riavvio Vertov…"); await api("/api/aggiornamenti", { azione: "riavvia" }); return; }
+  try { await api("/api/aggiornamenti", { azione: "installa", voci: sceltiAggiornamenti() }); }
+  catch (e) { testo($("#agg-spiega"), e.message); return; }
+  aggInCorso = true;
+  document.querySelectorAll("#agg-voci input, #agg-installa, #agg-annulla, #agg-salta").forEach(b => b.disabled = true);
+  $("#agg-avanzamento").hidden = false;
+  seguiAggiornamento();
+};
+async function seguiAggiornamento() {
+  const { installazione: i } = await api("/api/aggiornamenti");
+  testo($("#agg-fase"), i.fase + (i.totale ? ` · ${i.fatti.toLocaleString("it-IT")} di ${i.totale.toLocaleString("it-IT")}` : ""));
+  $("#agg-barra").style.width = i.totale ? (100 * i.fatti / i.totale) + "%" : "0";
+  if (i.attiva) return setTimeout(seguiAggiornamento, 700);
+  aggInCorso = false;
+  const b = $("#agg-installa"); b.disabled = false; $("#agg-annulla").disabled = false;
+  $("#agg-avanzamento").hidden = true;
+  let msg = i.riusciti.length ? "Aggiornati: " + i.riusciti.join(", ") + "." : "";
+  if (i.falliti.length) msg += (msg ? " " : "") + "Non riusciti: " + i.falliti.join("; ") + ". Il resto è rimasto com'era.";
+  if (i.riavvia) {
+    testo($("#agg-spiega"), msg + " Riavvia Vertov per usare la versione nuova: la sessione resta com'è.");
+    b.textContent = "Riavvia Vertov"; b.dataset.modo = "riavvia";
+  } else {
+    testo($("#agg-spiega"), msg);
+    b.textContent = "OK"; b.dataset.modo = "chiudi"; $("#agg-annulla").hidden = true;
+  }
+  aggiorna(true);
+}
+
+/* ---------- libera spazio ---------- */
+function peso(byte) {
+  if (byte >= 2 ** 30) return (byte / 2 ** 30).toLocaleString("it-IT", { maximumFractionDigits: 1 }) + " GB";
+  if (byte >= 2 ** 20) return Math.round(byte / 2 ** 20).toLocaleString("it-IT") + " MB";
+  return Math.max(1, Math.round(byte / 1024)) + " KB";
+}
+let vociPulizia = [];
+async function apriPulizia() {
+  $("#finestra-pulizia").hidden = false;
+  testo($("#pulizia-totale"), "Misuro lo spazio occupato…");
+  $("#pulizia-voci").replaceChildren(); $("#pulizia-cancella").disabled = true;
+  $("#pulizia-cancella").textContent = "Cancella"; $("#pulizia-cancella").dataset.modo = "cancella";
+  $("#pulizia-annulla").hidden = false;
+  try { vociPulizia = (await api("/api/pulizia")).voci; } catch (e) { testo($("#pulizia-totale"), e.message); return; }
+  const box = $("#pulizia-voci");
+  if (!vociPulizia.length) { box.appendChild(crea("p", "spiega", "Non c'è niente da cancellare.")); }
+  for (const v of vociPulizia) {
+    const riga = crea("label", "novita-voce pulizia-voce");
+    const c = crea("input"); c.type = "checkbox"; c.checked = v.consigliata; c.dataset.chiave = v.chiave; c.onchange = totalePulizia;
+    const d = crea("div"); d.append(crea("b", "", v.nome), crea("div", "spiega", v.spiega));
+    riga.append(c, d, crea("span", "peso", peso(v.byte))); box.appendChild(riga);
+  }
+  totalePulizia();
+}
+function totalePulizia() {
+  const scelte = [...document.querySelectorAll("#pulizia-voci input:checked")].map(c => c.dataset.chiave);
+  const byte = vociPulizia.filter(v => scelte.includes(v.chiave)).reduce((a, v) => a + v.byte, 0);
+  testo($("#pulizia-totale"), scelte.length ? `Libererai ${peso(byte)}` : "");
+  $("#pulizia-cancella").disabled = !scelte.length;
+}
+function chiudiPulizia() { $("#finestra-pulizia").hidden = true; }
+$("#pulizia-annulla").onclick = chiudiPulizia;
+$("#pulizia-cancella").onclick = async () => {
+  const b = $("#pulizia-cancella");
+  if (b.dataset.modo === "chiudi") return chiudiPulizia();
+  const chiavi = [...document.querySelectorAll("#pulizia-voci input:checked")].map(c => c.dataset.chiave);
+  b.disabled = true; testo($("#pulizia-totale"), "Cancello…");
+  try {
+    const r = await api("/api/pulizia", { chiavi });
+    testo($("#pulizia-totale"), `Fatto: liberati ${peso(r.liberati)}.`);
+    $("#pulizia-voci").replaceChildren();
+    b.textContent = "OK"; b.dataset.modo = "chiudi"; $("#pulizia-annulla").hidden = true;
+  } catch (e) { testo($("#pulizia-totale"), e.message); }
+  b.disabled = false;
+};
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (!$("#finestra-aggiornamenti").hidden) chiudiAggiornamenti();
+  if (!$("#finestra-pulizia").hidden) chiudiPulizia();
+});
+
+aggiorna().then(() => { $("#nome-sessione").value = progetto.nome || ""; if (progetto.out) { caricaVolti(); caricaRisultati(); }
+  setTimeout(() => cercaAggiornamenti(false), 3000); });
+</script>
+</body>
+</html>

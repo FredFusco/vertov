@@ -1,0 +1,23 @@
+# Su GitHub va SOLO il programma Vertov. Si esclude tutto e si ammettono soltanto
+# i tipi di file del programma: così un video, un audio, un PDF, una sceneggiatura,
+# un SRT o un risultato finiti per sbaglio in questa cartella non vengono mai pubblicati.
+*
+!*/
+!.gitignore
+!*.py
+!interfaccia.html
+!aiuto.html
+!LEGGIMI.md
+!VERSIONE
+!aggiornamenti.json
+!icona_vertov*.svg
+!icona_vertov.png
+!suono_fine.wav
+!caratteri/*.woff2
+!caratteri/OFL.txt
+!Vertov.app/**
+# Mai, nemmeno se dentro ci fossero file ammessi:
+prova_reale/
+dist/
+__pycache__/
+.DS_Store

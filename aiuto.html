@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guida di Vertov</title>
+<style>
+:root { --carta:#f4ede0; --inchiostro:#2b2a33; --tenue:#6b6670; --linea:#dcd2c0; --ocra:#d9a441;
+  --serif:"Iowan Old Style","Baskerville","Palatino",Georgia,serif; }
+@media (prefers-color-scheme: dark) { :root { --carta:#1f1e25; --inchiostro:#f1eadc; --tenue:#a7a1a9; --linea:#3d3c47; --ocra:#e0b25a; } }
+body { margin:0; background:var(--carta); color:var(--inchiostro); font:15px/1.6 -apple-system,"Helvetica Neue",sans-serif; }
+main { max-width:720px; margin:0 auto; padding:28px 20px 60px; }
+h1 { font:500 32px/1.2 var(--serif); margin:0 0 4px; }
+.sotto { color:var(--tenue); font:italic 15px var(--serif); margin:0 0 20px; }
+h2 { font:500 21px/1.3 var(--serif); margin:28px 0 8px; padding-top:10px; border-top:1px solid var(--linea); }
+kbd { font:12px ui-monospace,Menlo,monospace; border:1px solid var(--linea); border-radius:5px; padding:1px 5px; }
+li { margin:4px 0; }
+.nota { border-left:3px solid var(--ocra); padding-left:12px; color:var(--tenue); }
+</style></head><body><main>
+<h1>Guida di Vertov</h1>
+<p class="sotto">Il cine-occhio che descrive ogni inquadratura del tuo film</p>
+
+<h2>In tre gesti</h2>
+<ol>
+  <li><b>Trascina i materiali</b> nella scheda Materiali: video, audio, documenti, anche tutti insieme o un'intera cartella. Vertov riconosce da solo cosa sono e come usarli.</li>
+  <li><b>Premi «Descrivi il film»</b> <kbd>⌘R</kbd>. Vertov fa tutto da solo: avvia Ollama e scarica il modello se serve, trascrive i dialoghi con Whisper se manca una trascrizione, riconosce i volti e dà loro un nome, descrive ogni inquadratura e scrive il report.</li>
+  <li><b>Alla fine</b> trovi descrizioni, foglio di calcolo, marker per Resolve e il report in <i>Risultato › Esporta</i>. Un suono ti avvisa quando ha finito.</li>
+</ol>
+
+<h2>Materiali</h2>
+<ul>
+  <li><b>Video:</b> il film montato (MOV, MP4, MXF…). È l'unico indispensabile.</li>
+  <li><b>Montaggio:</b> un AAF (consigliato) o un EDL. Dall'AAF Vertov legge tagli, scena/inquadratura/ciak e note del bin, camera e ottica, effetti, titoli e marker. Senza montaggio i tagli vengono rilevati dalle immagini.</li>
+  <li><b>Audio:</b> stem dialoghi, effetti e musica, o il mix. Il tipo si capisce dal nome del file (DX, PD, FX, SFX, MX, MUS, MIX…) o ascoltando la traccia.</li>
+  <li><b>Documenti:</b> sceneggiatura (PDF, FDX, Fountain), trascrizione dei dialoghi (SRT, VTT), ordini del giorno (PDF, anche una cartella), schede dei personaggi (righe <i>Nome: aspetto</i>).</li>
+</ul>
+<p class="nota">Se un riconoscimento è sbagliato, cambia il ruolo con «Usa come…». Un file spostato o su un disco scollegato appare in rosso.</p>
+
+<h2>Esportare l'AAF da Avid</h2>
+<p>Nel bin seleziona la sequenza, poi <i>File › Output › Export to File…</i>, formato <b>AAF</b>, con <i>Link to (Don't Export) Media</i>. I media non servono: basta la struttura del montaggio con i metadati.</p>
+
+<h2>Controllare i volti</h2>
+<p>Vertov dà da solo un nome alle persone che riconosce. A lavoro finito, se vuoi verificarli, premi <b>Controlla i volti…</b> <kbd>⌘3</kbd>: ogni riquadro è una persona. Correggi i nomi e premi <b>Applica</b> (o <b>OK</b> per applicare e chiudere): le inquadrature dove compare un nome cambiato vengono ridescritte. <b>Annulla</b> chiude senza cambiare nulla.</p>
+
+<h2>Correggere una descrizione</h2>
+<p>Nella tabella del Risultato premi <b>Correggi</b> su un'inquadratura e riscrivila com'è davvero: Vertov la tiene così e aggiorna le altre inquadrature della stessa scena perché restino coerenti.</p>
+
+<h2>Il report</h2>
+<p>Alla fine di ogni analisi Vertov scrive un report: materiali usati, montaggio e marker, una sinossi per ogni scena, i personaggi con il loro tempo in scena, dialoghi e sonoro, correzioni e cose da controllare. Aprilo da <i>Esporta › Report</i> e salvalo in PDF con il pulsante in alto, oppure <i>File › Esporta il report…</i> <kbd>⌘E</kbd>.</p>
+
+<h2>Sessioni</h2>
+<p>Ogni film è una sessione: <i>Nuova</i> <kbd>⌘N</kbd>, <i>Apri…</i> <kbd>⌘O</kbd>, <i>Salva</i> <kbd>⌘S</kbd>. Eliminare una sessione non tocca mai i file originali; i risultati vanno nel Cestino solo se lo scegli.</p>
+
+<h2>Tempi</h2>
+<p>Su un Mac M5 Max servono 12–25 secondi per inquadratura: per un film di 2.000 inquadrature, 7–12 ore. Puoi fermare <kbd>⌘.</kbd> e riprendere quando vuoi.</p>
+
+<h2>Componenti e aggiornamenti</h2>
+<p>Per funzionare Vertov usa alcuni componenti gratuiti, installati su questo Mac:</p>
+<ul>
+  <li><b>Programmi:</b> <i>ffmpeg</i>, che legge video e audio ed estrae i fotogrammi, e <i>Ollama</i>, che fa girare il modello di visione. Sono installati con Homebrew.</li>
+  <li><b>Librerie Python:</b> pywebview (la finestra), OpenCV (i volti), mlx-whisper (la trascrizione), Transformers e PyTorch (i suoni), pyaaf2 (gli AAF), pypdf (i PDF).</li>
+  <li><b>Modelli di intelligenza artificiale:</b> Qwen3-VL guarda le immagini, Whisper trascrive i dialoghi, AST riconosce i suoni, YuNet e SFace trovano e confrontano i volti.</li>
+</ul>
+<p>Una volta al giorno, all'avvio, Vertov controlla se ci sono versioni nuove di questi componenti e di Vertov stesso, e ti chiede se vuoi installarle. Puoi scegliere cosa aggiornare, rimandare o saltare una versione. Per controllare quando vuoi: <i>Vertov › Controlla aggiornamenti…</i> o il pulsante <b>Aggiornamenti…</b>. Se le librerie nuove non funzionano con Vertov, vengono rimesse da sole quelle di prima.</p>
+<p class="nota">Vertov non usa Claude né altri servizi online: Claude è servito solo a scriverlo.</p>
+
+<h2>Libera spazio</h2>
+<p>Con <b>Libera spazio…</b> (anche in <i>File</i>) vedi quanto occupano i file temporanei e di cache di Vertov e scegli cosa cancellare: fotogrammi estratti, registri, file scaricati durante le installazioni, modelli non usati. Materiali, risultati e sessioni non vengono mai toccati.</p>
+
+<h2>Privacy</h2>
+<p>Tutto gira su questo Mac: nessun file viene inviato da nessuna parte. Vertov si collega a internet solo per controllare e scaricare gli aggiornamenti.</p>
+</main></body></html>
