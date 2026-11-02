@@ -329,7 +329,7 @@ def leggi_sceneggiatura(percorso: Path) -> list:
 # --------------------------------------------------------------------------
 
 def _nome_battuta(riga: str) -> str:
-    """Nome del personaggio se la riga è un'attacco di battuta (es. "ANNA (CONT'D)")."""
+    """Nome del personaggio se la riga è un'attacco di battuta (es. "TERESA (CONT'D)")."""
     r = re.sub(r"\(.*?\)", "", riga).strip()
     if 2 <= len(r) <= 30 and r.upper() == r and re.fullmatch(r"[A-ZÀ-Ý'’ .]+", r) \
             and not INTESTAZIONE.match(r) and not r.endswith(":"):
@@ -340,8 +340,8 @@ def _nome_battuta(riga: str) -> str:
 def estrai_personaggi(scene: list) -> dict:
     """Descrizione di ogni personaggio alla sua prima apparizione nel copione.
 
-    Riconosce le forme "ANNA (16), riccioli biondi..." e "MARCO, un bel
-    ragazzo...", dove il nome in maiuscolo è seguito da una virgola.
+    Riconosce le forme "TERESA (30), capelli corti..." e "PAOLO, un uomo
+    alto...", dove il nome in maiuscolo è seguito da una virgola.
     """
     conteggio = {}
     for sc in scene:
@@ -591,9 +591,9 @@ ordini del giorno o nelle inquadrature vicine.
 sull'analisi del sonoro e sulle battute se presenti; se non hai informazioni audio scrivi \
 "non analizzato".
 - dialoghi_riassunto: di cosa parlano i personaggi in questa inquadratura, in una o due frasi \
-con parole tue: RIASSUMI il senso, non citare le battute tra virgolette (es. "Anna chiede a \
-Marco se ha già parlato con il padre; Marco ammette di non averne il coraggio"). Chi dice cosa: \
-usa il personaggio indicato nel copione per ogni battuta ("nel copione ANNA: ..."); per \
+con parole tue: RIASSUMI il senso, non citare le battute tra virgolette (es. "Teresa chiede a \
+Paolo se ha già parlato con il padre; Paolo ammette di non averne il coraggio"). Chi dice cosa: \
+usa il personaggio indicato nel copione per ogni battuta ("nel copione TERESA: ..."); per \
 le battute senza corrispondenza nel copione non attribuirle a un personaggio preciso se \
 non è evidente. Se nessuno parla scrivi stringa vuota.
 - descrizione: due o tre frasi riassuntive, come in un découpage: cosa succede e, se i \

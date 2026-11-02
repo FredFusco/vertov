@@ -21,6 +21,7 @@ Annuncio (vertov.json):
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -337,8 +338,10 @@ def _installa_modello_visione(modello: str) -> None:
 
 def _installa_modello_hf(repo: str) -> None:
     _fase(f"Aggiorno {repo.split('/')[-1]}")
+    # Online di proposito: durante il lavoro audio.py tiene Hugging Face fuori linea (HF_HUB_OFFLINE).
     r = subprocess.run([sys.executable, "-c", "import sys; from huggingface_hub import snapshot_download; "
-                        "snapshot_download(sys.argv[1])", repo], capture_output=True, text=True, timeout=3600)
+                        "snapshot_download(sys.argv[1])", repo], capture_output=True, text=True, timeout=3600,
+                       env={**os.environ, "HF_HUB_OFFLINE": "0", "HF_HUB_DISABLE_TELEMETRY": "1"})
     if r.returncode:
         raise RuntimeError("download non riuscito: " + (r.stderr.strip().splitlines() or ["errore"])[-1])
 

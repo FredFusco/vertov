@@ -29,8 +29,8 @@ OLLAMA = "http://localhost:11434"
 CONTESTO = 16384      # token di contesto chiesti a Ollama: lo stesso in ogni richiesta di Vertov
 TENUTA = "5m"         # quanto Ollama tiene il modello in memoria dopo l'ultima richiesta di Vertov
 VARIABILE_GENITORE = "VERTOV_APP"   # pid dell'app che ha lanciato l'analisi
-# Murnau e Ozu cercano proprio questo percorso per riconoscere un'analisi di Vertov.
-PROGRAMMA = "descrittore_inquadrature/descrivi.py"
+# Murnau e Ozu cercano proprio questo percorso ("vertov/descrivi.py") per riconoscere un'analisi di Vertov.
+PROGRAMMA = f"{Path(__file__).resolve().parent.name}/descrivi.py"
 
 
 def _processi() -> list:

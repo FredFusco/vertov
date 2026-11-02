@@ -11,12 +11,26 @@ Tutto gira in locale. Le librerie pesanti vengono caricate solo se servono.
 
 import json
 import math
+import os
 import subprocess
 from pathlib import Path
 
 CAMPIONAMENTO = 16000
 MODELLO_TAG = "MIT/ast-finetuned-audioset-10-10-0.4593"
 MODELLO_WHISPER = "mlx-community/whisper-large-v3-turbo"
+HF_CACHE = Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def _in_locale(repo: str) -> bool:
+    return any((HF_CACHE / ("models--" + repo.replace("/", "--")) / "snapshots").glob("*/*"))
+
+
+# Mentre si lavora non si contatta Hugging Face: se i modelli sono già sul Mac, le librerie non
+# chiedono più online se ne esiste una versione nuova (lo fa solo Aggiornamenti…), e niente
+# statistiche d'uso. Va deciso qui, prima che transformers e mlx_whisper vengano caricati.
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+if _in_locale(MODELLO_TAG) and _in_locale(MODELLO_WHISPER):
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
 FINESTRA_S = 10.0       # AST lavora su finestre di circa 10 secondi
 SILENZIO_DB = -55.0
 

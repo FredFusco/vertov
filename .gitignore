@@ -18,6 +18,7 @@
 !Vertov.app/**
 # Mai, nemmeno se dentro ci fossero file ammessi:
 prova_reale/
+file di lavoro/
 dist/
 __pycache__/
 .DS_Store

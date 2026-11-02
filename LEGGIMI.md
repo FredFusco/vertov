@@ -58,7 +58,7 @@ Se interrompi l'elaborazione, rilanciando lo stesso comando riparte da dove si e
 
 ## Risultati (nella cartella `--out`)
 
-Dall'app, `--out` è la cartella di lavoro della sessione (`~/My Drive/CLAUDE/Vertov – file di lavoro/<sessione>`, o `~/Library/Application Support/Vertov/Vertov – file di lavoro` se quella cartella non c'è): l'utente non la vede. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app sposta nella cartella di lavoro i file che le versioni precedenti lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
+Dall'app, `--out` è la cartella di lavoro della sessione (`file di lavoro/<sessione>` dentro la cartella di Vertov, esclusa da `.gitignore` e quindi mai pubblicata): l'utente non la vede. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app sposta nella cartella di lavoro i file che le versioni precedenti lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
 
 A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi `progresso.py`); l'app le mostra nel riquadro dell'esito insieme all'eventuale errore.
 
@@ -77,7 +77,7 @@ Su M5 Max servono 12–25 secondi per inquadratura, secondo la durata. Per un fi
 
 Le tre app usano lo stesso modello, Qwen3-VL, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (20 GB) a ogni cambio. Le regole stanno in `coordinamento.py`:
 
-- **Precedenza a Vertov**: Murnau e Ozu riconoscono un'analisi di Vertov dal programma `descrittore_inquadrature/descrivi.py` eseguito da Python, e aspettano. Non rinominare né spostare `descrivi.py` senza aggiornare anche loro.
+- **Precedenza a Vertov**: Murnau e Ozu riconoscono un'analisi di Vertov dal programma `vertov/descrivi.py` eseguito da Python, e aspettano. Non rinominare la cartella `vertov` né spostare `descrivi.py` senza aggiornare anche loro (`ALTRI_PROGRAMMI` in murnau/coordinamento.py, `PROGRAMMI_DI_ANALISI` in ozu/motore_locale.py).
 - **Un solo contesto**: ogni richiesta di Vertov (descrizioni, volti, report) usa lo stesso contesto (`CONTESTO`, 16384), così Vertov non costringe Ollama a ricaricare il modello nemmeno da solo.
 - **Una sola analisi di Vertov alla volta**; il modello resta in memoria 5 minuti (`TENUTA`) e a fine analisi viene tolto se è la copia di Vertov.
 - **Chiusura vera**: Ferma (e la chiusura della finestra) manda SIGTERM a tutta l'analisi e, dopo 5 secondi, SIGKILL. Un'analisi lanciata dall'app controlla ogni secondo che l'app esista ancora (`VERTOV_APP`) e altrimenti si spegne.
@@ -86,6 +86,7 @@ Le tre app usano lo stesso modello, Qwen3-VL, con impostazioni diverse: se lavor
 ## Aggiornamenti e spazio
 
 - `aggiornamenti.py` controlla Vertov (annuncio all'indirizzo in `aggiornamenti.json`), ffmpeg e Ollama (Homebrew), le librerie Python dell'ambiente e i modelli (Ollama, Hugging Face). L'app chiede prima di installare; le librerie tornano alla versione precedente se non si caricano più.
+- Durante il lavoro Hugging Face resta fuori linea (`HF_HUB_OFFLINE`, impostato in `audio.py` quando Whisper e AST sono già sul Mac): solo Aggiornamenti… lo contatta, e senza statistiche d'uso.
 - Vertov è pubblicato su GitHub (https://github.com/FredFusco/vertov): ogni versione è una release, e `aggiornamenti.json` punta a `releases/latest/download/vertov.json`.
 - Per pubblicare una versione nuova: `git commit` e `git push`, poi `python prepara_aggiornamento.py 1.1.0 "Novità…" --pubblica`.
 - Su GitHub finiscono solo i file del programma ammessi da `.gitignore`: mai film, audio, documenti o risultati.

@@ -36,10 +36,10 @@ DATI = Path.home() / "Library" / "Application Support" / "Vertov"
 SESSIONI = DATI / "sessioni"
 FILE_CORRENTE = DATI / "sessione_corrente.json"
 MODELLO = "qwen3-vl:30b-a3b-instruct"
-# I file con cui Vertov lavora (descrizioni grezze, volti, sinossi, trascrizione...) stanno qui, una
-# cartella per sessione. Nella cartella di destinazione scelta dall'utente finisce solo ciò che esporta.
-_DRIVE = Path.home() / "My Drive" / "CLAUDE"
-FILE_DI_LAVORO = (_DRIVE if _DRIVE.is_dir() else DATI) / "Vertov – file di lavoro"
+# I file con cui Vertov lavora (descrizioni grezze, volti, sinossi, trascrizione...) stanno dentro la
+# cartella di Vertov, una cartella per sessione (mai pubblicata: vedi .gitignore). Nella cartella di
+# destinazione scelta dall'utente finisce solo ciò che esporta.
+FILE_DI_LAVORO = CARTELLA / "file di lavoro"
 
 CAMPI_FILE = ["video", "edl", "sceneggiatura", "dialoghi", "odg", "audio_dialoghi",
               "audio_sfx", "audio_musica", "audio_mix", "out"]
@@ -149,10 +149,34 @@ def materiali_di(p: dict) -> set:
             + p.get("schede", []) + [x["percorso"] for x in p.get("scartati", [])] if x}
 
 
+def riporta_cartella_lavoro(p: dict) -> bool:
+    """Riporta in FILE_DI_LAVORO la cartella di lavoro della sessione se sta altrove: creata da una
+    versione precedente (in My Drive/CLAUDE) o rimasta con il percorso di prima dopo che la cartella
+    di Vertov ha cambiato nome. Restituisce True se la sessione è cambiata."""
+    if not p.get("cartella_lavoro"):
+        return False
+    vecchia = Path(p["cartella_lavoro"])
+    nuova = FILE_DI_LAVORO / vecchia.name
+    if vecchia == nuova:
+        return False
+    if vecchia.is_dir() and not nuova.exists():
+        FILE_DI_LAVORO.mkdir(parents=True, exist_ok=True)
+        __import__("shutil").move(str(vecchia), str(nuova))
+        if vecchia.parent.is_dir() and not any(x for x in vecchia.parent.iterdir() if x.name != ".DS_Store"):
+            __import__("shutil").rmtree(vecchia.parent)  # la vecchia cartella generale, rimasta vuota
+    elif not nuova.is_dir():
+        return False  # né qui né là: si lascia com'è, la cartella verrà ricreata quando serve
+    p["cartella_lavoro"] = str(nuova)
+    _file_sessione(p["id"]).write_text(json.dumps(p, ensure_ascii=False, indent=1))
+    return True
+
+
 def trasloca(p: dict) -> list:
     """Sposta nella cartella di lavoro i file che le versioni precedenti di Vertov lasciavano nella
     cartella dei risultati. Spostati, non cancellati; mai un file scelto come materiale."""
     spostati = []
+    if riporta_cartella_lavoro(p):
+        spostati.append(f"cartella di lavoro in {FILE_DI_LAVORO}")
     vecchio = SESSIONI / f"{p['id']}_personaggi.txt"
     if vecchio.exists():
         vecchio.replace(cartella_lavoro(p) / "personaggi_utente.txt")
