@@ -238,17 +238,25 @@ def aggiungi_materiali(p: dict, percorsi: list) -> list:
     return voci
 
 
+def assenti(p: dict) -> list:
+    """Materiali facoltativi che non si trovano (spostati, o su un disco scollegato): l'analisi va avanti senza."""
+    scelti = [p[c] for c, opzione in OPZIONI.items() if opzione and p.get(c)] + lista_odg(p)
+    return [x for x in scelti if not Path(x).exists()]
+
+
 def comando(p: dict, solo_volti: bool = False, rifai: list = ()) -> list:
     # prepara.py avvia Ollama e scarica il modello se serve, poi passa a descrivi.py.
     modello = p.get("modello") or MODELLO
     cmd = [sys.executable, "-u", str(CARTELLA / "prepara.py"), "--modello", modello, "--",
            str(CARTELLA / "descrivi.py"), p["video"], "--out", p["out"], "--modello", modello]
+    mancano = assenti(p)
     for campo, opzione in OPZIONI.items():
-        if opzione and p.get(campo):
+        if opzione and p.get(campo) and p[campo] not in mancano:
             cmd += [opzione, p[campo]]
-    if lista_odg(p):
-        cmd += ["--odg", *lista_odg(p)]
-    if not p.get("dialoghi") and p.get("trascrivi", True):  # senza trascrizione: Whisper
+    odg = [x for x in lista_odg(p) if x not in mancano]
+    if odg:
+        cmd += ["--odg", *odg]
+    if (not p.get("dialoghi") or p["dialoghi"] in mancano) and p.get("trascrivi", True):  # senza trascrizione: Whisper
         cmd.append("--trascrivi")
     if file_personaggi(p).exists() and file_personaggi(p).read_text(encoding="utf-8").strip():
         cmd += ["--personaggi", str(file_personaggi(p))]
@@ -262,6 +270,24 @@ def comando(p: dict, solo_volti: bool = False, rifai: list = ()) -> list:
 # --------------------------------------------------------------------------
 # Lavoro in corso (un solo processo alla volta)
 # --------------------------------------------------------------------------
+
+# Stima del tempo totale: secondi per inquadratura di ogni fase. Partono da valori tipici
+# e vengono sostituiti dai tempi misurati su questo Mac alla fine di ogni analisi.
+FILE_TEMPI = DATI / "tempi.json"
+TEMPI_TIPICI = {"fotogrammi": 0.4, "fotogrammi_volti": 0.6, "volti": 1.2, "confronto_volti": 0.2,
+                "descrizioni": 11.0, "report": 0.6}
+# Le fasi che restano, nell'ordine in cui arrivano, per ogni tipo di lavoro.
+SEQUENZE = {"descrizioni": ["fotogrammi", "fotogrammi_volti", "volti", "confronto_volti", "descrizioni", "report"],
+            "correzione": ["fotogrammi", "descrizioni", "report"],
+            "volti": ["fotogrammi", "descrizioni", "report"]}
+
+
+def tempi_per_inquadratura() -> dict:
+    try:
+        return {**TEMPI_TIPICI, **json.loads(FILE_TEMPI.read_text())}
+    except (OSError, ValueError):
+        return dict(TEMPI_TIPICI)
+
 
 class Lavoro:
     def __init__(self):
@@ -280,7 +306,7 @@ class Lavoro:
     def attivo(self) -> bool:
         return self.processo is not None and self.processo.poll() is None
 
-    def avvia(self, cmd: list, tipo: str, sessione: str, rifai: list = ()) -> None:
+    def avvia(self, cmd: list, tipo: str, sessione: str, rifai: list = (), assenti: list = ()) -> None:
         with self.blocco:
             if self.attivo():
                 raise RuntimeError("C'è già un'elaborazione in corso.")
@@ -288,6 +314,8 @@ class Lavoro:
             self.sessione, self.rifai = sessione, list(rifai)
             self.inizio_fase = {}
             self.log.clear()
+            for x in assenti:
+                self.log.append(f"Non trovo {Path(x).name}: vado avanti senza (il file è stato spostato o il disco è scollegato).")
             self.inizio = time.time()
             self.processo = subprocess.Popen(
                 cmd, cwd=CARTELLA, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -310,7 +338,62 @@ class Lavoro:
             elif riga and "warn" not in riga.lower() and "%|" not in riga:
                 self.log.append(riga)
         self.codice = self.processo.wait()
+        if self.codice == 0:
+            self.impara_tempi()
         avvisa_fine(self.tipo, self.codice)
+
+    def impara_tempi(self) -> None:
+        """Salva quanto ha richiesto ogni fase per inquadratura, per stimare meglio le prossime volte."""
+        fine = time.time()
+        inizi = sorted(self.inizio_fase.items(), key=lambda x: x[1])
+        tempi = tempi_per_inquadratura()
+        for (fase, t0), seguente in zip(inizi, inizi[1:] + [("", fine)]):
+            a = self.avanz.get(fase)
+            if fase not in TEMPI_TIPICI or not a or a["totale"] < 5:
+                continue
+            fatti = a["fatti"] - a["primo"][0] if fase == "descrizioni" else a["totale"]
+            if fatti >= 5:
+                # Media con il valore precedente: un'analisi un po' più lenta non stravolge le stime.
+                tempi[fase] = round(0.5 * tempi[fase] + 0.5 * (seguente[1] - t0) / fatti, 3)
+        try:
+            DATI.mkdir(parents=True, exist_ok=True)
+            FILE_TEMPI.write_text(json.dumps(tempi, indent=1))
+        except OSError:
+            pass
+
+    def stima(self) -> dict:
+        """Percentuale complessiva e tempo che manca, sommando la fase in corso e quelle che seguono."""
+        if not self.attivo():
+            return {"percento": None, "restano": None}
+        tempi = tempi_per_inquadratura()
+        trascorso = time.time() - self.inizio
+        # Quante inquadrature si lavorano: lo dice la prima fase che le conta.
+        n = next((a["totale"] for f in ("fotogrammi", "descrizioni") if (a := self.avanz.get(f))), None)
+        sequenza = SEQUENZE.get(self.tipo, [])
+        if n is None or self.fase not in sequenza:
+            return {"percento": None, "restano": None}  # avvio, download del modello, trascrizione
+        restano = 0.0
+        a = self.avanz.get(self.fase)
+        if a and a["totale"]:
+            fatti0, t0 = a["primo"]
+            if a["fatti"] - fatti0 >= 2:
+                passo = (a["ora"] - t0) / (a["fatti"] - fatti0)
+            else:
+                passo = tempi.get(self.fase, 0)
+            restano += passo * (a["totale"] - a["fatti"])
+            # Il tempo scende anche mentre lavora su un'inquadratura, senza scavalcare la successiva.
+            if a["fatti"] < a["totale"]:
+                restano -= min(time.time() - a["ora"], passo * 0.9)
+        else:
+            restano += tempi.get(self.fase, 0) * n
+        da_descrivere = n
+        if (d := self.avanz.get("descrizioni")):
+            da_descrivere = d["totale"] - d["fatti"]
+        for fase in sequenza[sequenza.index(self.fase) + 1:]:
+            restano += tempi.get(fase, 0) * (da_descrivere if fase == "descrizioni" else n)
+        restano = max(restano, 0.0)
+        return {"percento": min(99, int(100 * trascorso / (trascorso + restano))) if trascorso + restano else 0,
+                "restano": restano}
 
     def ferma(self) -> None:
         if self.attivo():
@@ -327,7 +410,7 @@ class Lavoro:
             avanz[nome] = {"fatti": a["fatti"], "totale": a["totale"], "eta": eta}
         return {"attivo": self.attivo(), "tipo": self.tipo, "fase": self.fase, "avanzamento": avanz,
                 "durata": time.time() - self.inizio if self.inizio else 0, "codice": self.codice,
-                "sessione": self.sessione, "rifai": self.rifai, "log": list(self.log)[-60:]}
+                "sessione": self.sessione, "rifai": self.rifai, "log": list(self.log)[-60:], **self.stima()}
 
 
 LAVORO = Lavoro()
@@ -497,7 +580,7 @@ def correggi(progetto: dict, numero: int, testo: str) -> list:
         correzioni.pop(str(numero), None)
     (out / "correzioni.json").write_text(json.dumps(correzioni, ensure_ascii=False, indent=1), encoding="utf-8")
     scena = inquadrature_della_scena(out, numero)
-    LAVORO.avvia(comando(progetto, rifai=scena), "correzione", progetto["id"], scena)
+    LAVORO.avvia(comando(progetto, rifai=scena), "correzione", progetto["id"], scena, assenti(progetto))
     return scena
 
 
@@ -659,7 +742,8 @@ class Gestore(BaseHTTPRequestHandler):
                     raise RuntimeError("Mancano il video o la cartella dei risultati.")
                 if not Path(progetto["video"]).exists():
                     raise RuntimeError("Il video non si trova più: trascinalo di nuovo in Materiali.")
-                LAVORO.avvia(comando(progetto, dati.get("fase") == "volti"), dati.get("fase", ""), progetto["id"])
+                LAVORO.avvia(comando(progetto, dati.get("fase") == "volti"), dati.get("fase", ""), progetto["id"],
+                             assenti=assenti(progetto))
                 self._json({"ok": True})
             elif url.path == "/api/ferma":
                 LAVORO.ferma()
@@ -674,7 +758,7 @@ class Gestore(BaseHTTPRequestHandler):
                 da_rifare = sorted({n for g in cambiati for n in prima[g]["inquadrature"]} & descritte)
                 aggiorna_info_gruppi(out, dati.get("nomi", {}))
                 if da_rifare and dati.get("aggiorna", True):
-                    LAVORO.avvia(comando(progetto, rifai=da_rifare), "volti", progetto["id"], da_rifare)
+                    LAVORO.avvia(comando(progetto, rifai=da_rifare), "volti", progetto["id"], da_rifare, assenti(progetto))
                 self._json({"ok": True, "cambiati": cambiati, "inquadrature": da_rifare})
             elif url.path == "/api/report":
                 report = Path(progetto.get("out", "")) / "report_vertov.html"

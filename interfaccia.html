@@ -136,6 +136,13 @@ textarea {
 }
 .avviso { color: var(--rosso); font-size: 14px; font-style: italic; min-height: 1.4em; margin-top: 8px; }
 /* avanzamento */
+.totale { display: flex; gap: 18px; align-items: center; margin-top: 14px; padding: 14px 16px; border: 1px solid var(--linea); border-radius: 12px; background: var(--carta); }
+.totale-cifra { font: 500 40px/1 var(--serif); font-variant-numeric: tabular-nums; min-width: 3.2ch; text-align: right; }
+.totale-corpo { flex: 1; display: grid; gap: 6px; }
+.barra.grande { height: 12px; border-radius: 6px; }
+.barra.grande > div { background: var(--ocra); border-radius: 6px; }
+.totale-testo { font-size: 13.5px; color: var(--tenue); font-variant-numeric: tabular-nums; }
+.schede .percento-scheda { font-size: 12px; color: var(--ocra); font-variant-numeric: tabular-nums; align-self: center; }
 .fasi { display: grid; gap: 10px; margin-top: 14px; }
 .fase { display: grid; grid-template-columns: 200px 1fr 150px; gap: 12px; align-items: center; font-size: 14px; }
 .fase .nome { font-weight: 600; }
@@ -286,7 +293,7 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
   </div>
   <nav class="schede" role="tablist">
     <button role="tab" data-scheda="materiali" aria-selected="true"><span class="numero">1</span> Materiali</button>
-    <button role="tab" data-scheda="risultato" aria-selected="false"><span class="numero">2</span> Risultato <span class="in-corso" hidden></span></button>
+    <button role="tab" data-scheda="risultato" aria-selected="false"><span class="numero">2</span> Risultato <span class="in-corso" hidden></span><span class="percento-scheda" id="percento-scheda"></span></button>
   </nav>
 </header>
 
@@ -353,6 +360,13 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
         <button class="bottone piccolo" data-apri="cartella">Cartella</button>
       </div>
       <div class="avviso" id="avviso"></div>
+      <div class="totale" id="totale" hidden>
+        <div class="totale-cifra" id="totale-percento"></div>
+        <div class="totale-corpo">
+          <div class="barra grande"><div id="totale-barra"></div></div>
+          <div class="totale-testo" id="totale-testo"></div>
+        </div>
+      </div>
       <div class="fasi" id="fasi"></div>
       <details class="log"><summary>Dettagli dell'elaborazione</summary><pre id="log"></pre></details>
       <div class="contenitore-tabella"><table class="tabella" id="risultati"></table></div>
@@ -897,6 +911,30 @@ async function avvia(fase) {
 $("#avvia-descrizioni").onclick = () => avvia("descrizioni");
 $("#ferma").onclick = () => api("/api/ferma", {});
 
+function oraFine(secondi) {
+  const fine = new Date(Date.now() + secondi * 1000);
+  const oggi = fine.toDateString() === new Date().toDateString();
+  return (oggi ? "" : "domani ") + "verso le " + fine.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+}
+function disegnaTotale(l) {
+  // Percentuale di tutto il lavoro e tempo che manca, sopra le singole fasi.
+  const box = $("#totale");
+  const mio = !l.sessione || l.sessione === progetto.id;
+  box.hidden = !(l.attivo && mio);
+  testo($("#percento-scheda"), l.attivo && l.percento != null ? l.percento + "%" : "");
+  if (box.hidden) return;
+  if (l.percento == null) {
+    testo($("#totale-percento"), "…");
+    $("#totale-barra").style.width = "2%";
+    const fase = NOMI_FASI[l.fase];
+    testo($("#totale-testo"), (fase ? fase + ": " : "") + "calcolo il tempo necessario… · in corso da " + (durata(l.durata) || "pochi secondi"));
+    return;
+  }
+  testo($("#totale-percento"), l.percento + "%");
+  $("#totale-barra").style.width = l.percento + "%";
+  const resta = l.restano < 60 ? "meno di un minuto" : "circa " + durata(l.restano);
+  testo($("#totale-testo"), `Mancano ${resta} (fine ${oraFine(l.restano)}) · in corso da ${durata(l.durata) || "pochi secondi"}`);
+}
 function disegnaFasi(l) {
   // L'avanzamento compare nella scheda del lavoro in corso (volti o descrizioni e correzioni).
   const qui = $("#fasi");
@@ -960,6 +998,7 @@ async function aggiorna(subito) {
     avvisoVolti.appendChild(b);
   }
   disegnaFasi(l);
+  disegnaTotale(l);
   testo($("#log"), l.log.join("\n"));
   const eraAttivo = ultimoLavoro && ultimoLavoro.attivo;
   ultimoLavoro = l;
