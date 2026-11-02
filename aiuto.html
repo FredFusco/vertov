@@ -21,7 +21,7 @@ li { margin:4px 0; }
 <ol>
   <li><b>Trascina i materiali</b> nella scheda Materiali: video, audio, documenti, anche tutti insieme o un'intera cartella. Vertov riconosce da solo cosa sono e come usarli.</li>
   <li><b>Premi «Descrivi il film»</b> <kbd>⌘R</kbd>. Vertov fa tutto da solo: avvia Ollama e scarica il modello se serve, trascrive i dialoghi con Whisper se manca una trascrizione, riconosce i volti e dà loro un nome, descrive ogni inquadratura e scrive il report.</li>
-  <li><b>Alla fine</b> trovi descrizioni, foglio di calcolo, marker per Resolve e il report in <i>Risultato › Esporta</i>. Un suono ti avvisa quando ha finito.</li>
+  <li><b>Alla fine</b> un suono ti avvisa e compare un riquadro con l'esito: tutto a posto, cose da verificare o un errore che ha interrotto il lavoro. Poi in <i>Risultato › Esporta</i> scegli i file che ti servono e premi <b>Esporta</b>.</li>
 </ol>
 
 <h2>Materiali</h2>
@@ -43,10 +43,16 @@ li { margin:4px 0; }
 <p>Nella tabella del Risultato premi <b>Correggi</b> su un'inquadratura e riscrivila com'è davvero: Vertov la tiene così e aggiorna le altre inquadrature della stessa scena perché restino coerenti.</p>
 
 <h2>Il report</h2>
-<p>Alla fine di ogni analisi Vertov scrive un report: materiali usati, montaggio e marker, una sinossi per ogni scena, i personaggi con il loro tempo in scena, dialoghi e sonoro, correzioni e cose da controllare. Aprilo da <i>Esporta › Report</i> e salvalo in PDF con il pulsante in alto, oppure <i>File › Esporta il report…</i> <kbd>⌘E</kbd>.</p>
+<p>Alla fine di ogni analisi Vertov scrive un report: materiali usati, montaggio e marker, una sinossi per ogni scena, i personaggi con il loro tempo in scena, dialoghi e sonoro, correzioni e cose da controllare. Aprilo con <b>Apri il report</b> e salvalo in PDF con il pulsante in alto, oppure esportalo in HTML insieme agli altri file.</p>
+
+<h2>Esportare</h2>
+<p>In <i>Risultato › Esporta</i> (o <i>File › Esporta…</i> <kbd>⌘E</kbd>) scegli cosa ti serve: foglio di calcolo, marker per DaVinci Resolve, report, trascrizione dei dialoghi, dati completi. Premendo <b>Esporta</b> i file vanno nella cartella indicata, con il nome della sessione (per esempio <i>Rullo 1 - descrizioni.csv</i>). Vertov ricorda le tue scelte; dopo una correzione puoi riesportare e i file vengono aggiornati.</p>
+
+<h2>File di lavoro</h2>
+<p>Per lavorare Vertov crea molti file suoi (descrizioni grezze, volti, sinossi, trascrizione, impostazioni). Non finiscono nella tua cartella: stanno in <i>My Drive › CLAUDE › Vertov – file di lavoro</i>, una cartella per sessione con lo stesso nome (se rinomini la sessione, si rinomina anche la cartella). Li vedi con <b>Mostra</b> in Materiali o <i>File › Mostra i file di lavoro</i>. Non serve aprirli: servono a Vertov per riprendere il lavoro, correggere e riesportare.</p>
 
 <h2>Sessioni</h2>
-<p>Ogni film è una sessione: <i>Nuova</i> <kbd>⌘N</kbd>, <i>Apri…</i> <kbd>⌘O</kbd>, <i>Salva</i> <kbd>⌘S</kbd>. Eliminare una sessione non tocca mai i file originali; i risultati vanno nel Cestino solo se lo scegli.</p>
+<p>Ogni film è una sessione: <i>Nuova</i> <kbd>⌘N</kbd>, <i>Apri…</i> <kbd>⌘O</kbd>, <i>Salva</i> <kbd>⌘S</kbd>. Eliminare una sessione non tocca mai i file originali; i file di lavoro e quelli esportati vanno nel Cestino solo se lo scegli.</p>
 
 <h2>Tempi</h2>
 <p>Su un Mac M5 Max servono 12–25 secondi per inquadratura: per un film di 2.000 inquadrature, 7–12 ore. Puoi fermare <kbd>⌘.</kbd> e riprendere quando vuoi.</p>

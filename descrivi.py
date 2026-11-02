@@ -876,8 +876,9 @@ def main() -> None:
         inquadrature = leggi_montaggio(args.edl, fps, tc_inizio_s)
         fuori = [q for q in inquadrature if q.inizio < -0.5 or q.fine > durata + 0.5]
         if fuori:
-            print(f"ATTENZIONE: {len(fuori)} inquadrature dell'EDL cadono fuori dal video. "
-                  f"Controlla --tc-inizio (ora {tc_inizio}).")
+            progresso.avviso(f"{len(fuori)} inquadrature del montaggio cadono fuori dal video e non sono state "
+                             f"descritte: controlla che video e montaggio siano della stessa versione "
+                             f"(inizio del video: {tc_inizio}).")
         inquadrature = [q for q in inquadrature if q not in fuori]
     else:
         inquadrature = rileva_tagli(args.video, durata, fps, tc_inizio_s, args.soglia_tagli)
@@ -1052,6 +1053,7 @@ def main() -> None:
 
     inizio_lavoro = time.time()
     nuove = 0
+    senza_fotogrammi = []
     progresso.fase("descrizioni")
     with file_jsonl.open("a", encoding="utf-8") as out:
         for q in selezione:
@@ -1060,6 +1062,7 @@ def main() -> None:
             foto = foto_tutte.get(q.numero)
             if not foto:
                 print(f"[{q.numero}] nessun fotogramma estratto, salto")
+                senza_fotogrammi.append(q.numero)
                 continue
             analisi = audio.analizza_inquadratura(tracce, riconoscitore, q.inizio, q.fine) if tracce else {}
             prompt = costruisci_prompt(q, vicini_di(q), max_scena=3000,
@@ -1100,6 +1103,10 @@ def main() -> None:
             print(f"[{q.numero}/{len(inquadrature)}] {q.tc_in}  {time.time() - t0:.0f}s  "
                   f"(mancano ~{restanti * media / 60:.0f} min)  {desc['descrizione'][:90]}")
 
+    if senza_fotogrammi:
+        progresso.avviso(f"{len(senza_fotogrammi)} inquadrature non descritte perché non se ne sono potuti estrarre "
+                         f"i fotogrammi: {', '.join(map(str, senza_fotogrammi[:20]))}"
+                         f"{'…' if len(senza_fotogrammi) > 20 else ''}.")
     risultati = [fatte[n] for n in sorted(fatte)]
     # Le righe rifatte sono state aggiunte in coda: si riscrive il file con una riga per inquadratura.
     file_jsonl.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in risultati),
@@ -1129,8 +1136,9 @@ def main() -> None:
         report.genera(args.out, args.modello)
     except Exception as e:
         print(f"Report non generato: {e}")
+        progresso.avviso(f"Il report non è stato creato: {e}")
     progresso.fase("fine")
-    print(f"\nFatto. Risultati in {args.out}/ (inquadrature.csv, inquadrature.jsonl, marker_resolve.edl)")
+    print(f"\nFatto. File di lavoro in {args.out}/")
 
 
 if __name__ == "__main__":

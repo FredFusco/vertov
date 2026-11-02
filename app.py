@@ -36,6 +36,10 @@ DATI = Path.home() / "Library" / "Application Support" / "Vertov"
 SESSIONI = DATI / "sessioni"
 FILE_CORRENTE = DATI / "sessione_corrente.json"
 MODELLO = "qwen3-vl:30b-a3b-instruct"
+# I file con cui Vertov lavora (descrizioni grezze, volti, sinossi, trascrizione...) stanno qui, una
+# cartella per sessione. Nella cartella di destinazione scelta dall'utente finisce solo ciò che esporta.
+_DRIVE = Path.home() / "My Drive" / "CLAUDE"
+FILE_DI_LAVORO = (_DRIVE if _DRIVE.is_dir() else DATI) / "Vertov – file di lavoro"
 
 CAMPI_FILE = ["video", "edl", "sceneggiatura", "dialoghi", "odg", "audio_dialoghi",
               "audio_sfx", "audio_musica", "audio_mix", "out"]
@@ -88,16 +92,95 @@ def carica_progetto() -> dict:
 
 def salva_progetto(p: dict) -> None:
     _scrivi_sessione(p)
-    if p.get("out"):
-        out = Path(p["out"])
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "progetto.json").write_text(json.dumps(p, ensure_ascii=False, indent=1))
+    if p.get("cartella_lavoro"):
+        (cartella_lavoro(p) / "progetto.json").write_text(json.dumps(p, ensure_ascii=False, indent=1))
 
 
-# File che Vertov crea nella cartella dei risultati: solo questi vengono tolti eliminando una sessione.
+def nome_per_file(testo: str) -> str:
+    """Il nome della sessione reso adatto a un nome di file o cartella."""
+    return re.sub(r'[/:\\\x00-\x1f]', "-", testo or "").strip(" .") or "Sessione"
+
+
+def _lavoro(p: dict) -> Path:
+    """La cartella di lavoro della sessione, senza crearla (una che non esiste se non è ancora assegnata)."""
+    return Path(p["cartella_lavoro"]) if p.get("cartella_lavoro") else Path("/nonesiste")
+
+
+def cartella_lavoro(p: dict) -> Path:
+    """La cartella di lavoro della sessione: la assegna (dal nome della sessione) e la crea se serve."""
+    if not p.get("cartella_lavoro"):
+        usate = set()
+        for f in SESSIONI.glob("*.json"):
+            try:
+                usate.add(json.loads(f.read_text()).get("cartella_lavoro"))
+            except (OSError, ValueError):
+                pass
+        base = nome_per_file(p.get("nome"))
+        c, n = FILE_DI_LAVORO / base, 2
+        while c.exists() or str(c) in usate:
+            c, n = FILE_DI_LAVORO / f"{base} {n}", n + 1
+        p["cartella_lavoro"] = str(c)
+        if _file_sessione(p["id"]).exists():  # senza cambiare la sessione aperta
+            _file_sessione(p["id"]).write_text(json.dumps(p, ensure_ascii=False, indent=1))
+    c = Path(p["cartella_lavoro"])
+    c.mkdir(parents=True, exist_ok=True)
+    return c
+
+
+def rinomina_cartella_lavoro(p: dict) -> None:
+    """Dopo aver cambiato nome alla sessione, anche la sua cartella di lavoro prende il nuovo nome."""
+    vecchia = _lavoro(p)
+    nuova = FILE_DI_LAVORO / nome_per_file(p.get("nome"))
+    if not vecchia.is_dir() or nuova == vecchia or nuova.exists() or LAVORO.attivo():
+        return
+    vecchia.rename(nuova)
+    p["cartella_lavoro"] = str(nuova)
+
+
+# File che Vertov creava nella cartella dei risultati, prima delle cartelle di lavoro.
 FILE_DI_VERTOV = ["inquadrature.jsonl", "inquadrature.csv", "marker_resolve.edl", "volti", "personaggi.txt",
                   "personaggi_utente.txt", "progetto.json", "correzioni.json", "battute_scartate.txt",
-                  "dialoghi_trascritti.srt", "inquadrature_prima_di_vertov.jsonl"]
+                  "dialoghi_trascritti.srt", "inquadrature_prima_di_vertov.jsonl", "report_vertov.html",
+                  "sinossi.json", "lavoro.json"]
+
+
+def materiali_di(p: dict) -> set:
+    return {str(Path(x).resolve()) for x in [p.get(r) for r in riconosci.RUOLI if r != "odg"] + lista_odg(p)
+            + p.get("schede", []) + [x["percorso"] for x in p.get("scartati", [])] if x}
+
+
+def trasloca(p: dict) -> list:
+    """Sposta nella cartella di lavoro i file che le versioni precedenti di Vertov lasciavano nella
+    cartella dei risultati. Spostati, non cancellati; mai un file scelto come materiale."""
+    spostati = []
+    vecchio = SESSIONI / f"{p['id']}_personaggi.txt"
+    if vecchio.exists():
+        vecchio.replace(cartella_lavoro(p) / "personaggi_utente.txt")
+    if not p.get("out") or not Path(p["out"]).is_dir():
+        return spostati
+    out, materiali = Path(p["out"]), materiali_di(p)
+    for nome in FILE_DI_VERTOV:
+        f = out / nome
+        if f.exists() and str(f.resolve()) not in materiali:
+            if nome == "marker_resolve.edl" and "Descrizioni inquadrature" not in f.read_text(errors="ignore")[:200]:
+                continue  # stesso nome, ma è il file di Murnau (che usa la stessa cartella)
+            dest = cartella_lavoro(p) / nome
+            if dest.exists():
+                continue  # c'è già una versione più recente nella cartella di lavoro
+            f.rename(dest) if f.stat().st_dev == dest.parent.stat().st_dev else __import__("shutil").move(f, dest)
+            spostati.append(nome)
+    return spostati
+
+
+def trasloca_tutte() -> None:
+    for f in SESSIONI.glob("*.json"):
+        try:
+            p = json.loads(f.read_text())
+            spostati = trasloca(p)
+            if spostati:
+                print(f"Sessione {p.get('nome')}: spostati nella cartella di lavoro {', '.join(spostati)}")
+        except Exception as e:
+            print(f"Sessione {f.stem}: file di lavoro non spostati ({e})")
 
 
 def _nel_cestino(percorso: Path) -> None:
@@ -118,17 +201,19 @@ def elimina_sessione(id_: str, risultati: bool) -> dict:
     p = json.loads(_file_sessione(id_).read_text())
     altre = [json.loads(f.read_text()) for f in SESSIONI.glob("*.json") if f.stem != id_]
     spostati = []
-    if risultati and p.get("out") and Path(p["out"]).is_dir() and \
-            not any(a.get("out") == p["out"] for a in altre):
-        out = Path(p["out"])
-        materiali = {str(Path(x).resolve()) for x in [p.get(r) for r in riconosci.RUOLI if r != "odg"] + lista_odg(p) + p.get("schede", [])
-                     + [x["percorso"] for x in p.get("scartati", [])] if x}
-        for nome in FILE_DI_VERTOV:
-            f = out / nome
+    if risultati:
+        materiali = materiali_di(p)
+        if _lavoro(p).is_dir():
+            _nel_cestino(_lavoro(p))
+            spostati.append(_lavoro(p).name)
+        for x in p.get("esportati", []):
+            f = Path(x)
             if f.exists() and str(f.resolve()) not in materiali:  # mai un file scelto come materiale
                 _nel_cestino(f)
-                spostati.append(nome)
-        if out.exists() and not any(x for x in out.iterdir() if x.name != ".DS_Store"):
+                spostati.append(f.name)
+        out = Path(p.get("out") or "/nonesiste")
+        if out.is_dir() and not any(a.get("out") == p["out"] for a in altre) and \
+                not any(x for x in out.iterdir() if x.name != ".DS_Store"):
             _nel_cestino(out)  # la cartella era solo di Vertov ed è rimasta vuota
     # Fotogrammi in cache (rigenerabili): si tolgono se nessun'altra sessione usa lo stesso video.
     if p.get("video") and not any(Path(a.get("video") or "").stem == Path(p["video"]).stem for a in altre):
@@ -156,17 +241,15 @@ def elenco_sessioni() -> list:
         except (OSError, ValueError):
             continue
         descritte = 0
-        if p.get("out") and (Path(p["out"]) / "inquadrature.jsonl").exists():
-            descritte = sum(1 for r in (Path(p["out"]) / "inquadrature.jsonl").open(encoding="utf-8") if r.strip())
+        if (_lavoro(p) / "inquadrature.jsonl").exists():
+            descritte = sum(1 for r in (_lavoro(p) / "inquadrature.jsonl").open(encoding="utf-8") if r.strip())
         elenco.append({"id": p["id"], "nome": p.get("nome", ""), "modificata": p.get("modificata", ""),
                        "video": Path(p["video"]).name if p.get("video") else "", "descritte": descritte})
     return sorted(elenco, key=lambda e: e["modificata"], reverse=True)
 
 
 def file_personaggi(p: dict) -> Path:
-    if p.get("out"):
-        return Path(p["out"]) / "personaggi_utente.txt"
-    return SESSIONI / f"{p['id']}_personaggi.txt"  # finché non c'è la cartella dei risultati
+    return cartella_lavoro(p) / "personaggi_utente.txt"
 
 
 def lista_odg(p: dict) -> list:
@@ -207,13 +290,10 @@ def assegna(p: dict, percorso: str, ruolo: str) -> None:
     if ruolo == "video":
         video = Path(percorso)
         if not p.get("out"):
-            p["out"] = str(video.parent / f"Vertov - {video.stem}")
-            vecchio = SESSIONI / f"{p['id']}_personaggi.txt"
-            if vecchio.exists():
-                Path(p["out"]).mkdir(parents=True, exist_ok=True)
-                vecchio.replace(Path(p["out"]) / "personaggi_utente.txt")
+            p["out"] = str(video.parent)  # le esportazioni, accanto al video
         if p.get("nome") in ("", "Nuova sessione"):
             p["nome"] = video.stem
+        cartella_lavoro(p)
     if ruolo.startswith("audio_") and not p.get("dialoghi") and "trascrivi" not in p:
         p["trascrivi"] = True  # senza trascrizione, i dialoghi si trascrivono dallo stem
 
@@ -249,7 +329,7 @@ def comando(p: dict, solo_volti: bool = False, rifai: list = ()) -> list:
     # prepara.py avvia Ollama e scarica il modello se serve, poi passa a descrivi.py.
     modello = p.get("modello") or MODELLO
     cmd = [sys.executable, "-u", str(CARTELLA / "prepara.py"), "--modello", modello, "--",
-           str(CARTELLA / "descrivi.py"), p["video"], "--out", p["out"], "--modello", modello]
+           str(CARTELLA / "descrivi.py"), p["video"], "--out", str(cartella_lavoro(p)), "--modello", modello]
     mancano = assenti(p)
     for campo, opzione in OPZIONI.items():
         if opzione and p.get(campo) and p[campo] not in mancano:
@@ -302,6 +382,9 @@ class Lavoro:
         self.codice = None
         self.sessione = ""
         self.rifai = []
+        self.avvisi = []      # cose da verificare segnalate durante il lavoro (righe "@@avviso")
+        self.fermata = False  # fermata dall'utente (Ferma o chiusura della finestra), non un errore
+        self.esito = None     # com'è andata, da mostrare finché l'utente non preme OK
         self.blocco = threading.Lock()
 
     def attivo(self) -> bool:
@@ -318,8 +401,11 @@ class Lavoro:
             self.sessione, self.rifai = sessione, list(rifai)
             self.inizio_fase = {}
             self.log.clear()
+            self.avvisi, self.fermata, self.esito = [], False, None
             for x in assenti:
-                self.log.append(f"Non trovo {Path(x).name}: vado avanti senza (il file è stato spostato o il disco è scollegato).")
+                avviso = f"Non trovo {Path(x).name}: vado avanti senza (il file è stato spostato o il disco è scollegato)."
+                self.log.append(avviso)
+                self.avvisi.append(avviso)
             self.inizio = time.time()
             self.processo = subprocess.Popen(
                 cmd, cwd=CARTELLA, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -341,12 +427,17 @@ class Lavoro:
                 self.avanz[nome] = {"fatti": int(fatti), "totale": int(totale),
                                     "primo": precedente.get("primo", (int(fatti), time.time())),
                                     "ora": time.time()}
+            elif riga.startswith("@@avviso "):
+                self.avvisi.append(riga.split(" ", 1)[1])
+                self.log.append(riga.split(" ", 1)[1])
             elif riga and "warn" not in riga.lower() and "%|" not in riga:
                 self.log.append(riga)
         self.codice = self.processo.wait()
         if self.codice == 0:
             self.impara_tempi()
-        avvisa_fine(self.tipo, self.codice)
+        if not self.fermata:
+            self.esito = esito_del_lavoro(self)
+            avvisa_fine(self.esito)
 
     def impara_tempi(self) -> None:
         """Salva quanto ha richiesto ogni fase per inquadratura, per stimare meglio le prossime volte."""
@@ -406,6 +497,7 @@ class Lavoro:
         if not self.attivo():
             return
         processo = self.processo
+        self.fermata = True
         try:
             os.killpg(processo.pid, signal.SIGTERM)
         except ProcessLookupError:
@@ -429,28 +521,64 @@ class Lavoro:
             avanz[nome] = {"fatti": a["fatti"], "totale": a["totale"], "eta": eta}
         return {"attivo": self.attivo(), "tipo": self.tipo, "fase": self.fase, "avanzamento": avanz,
                 "durata": time.time() - self.inizio if self.inizio else 0, "codice": self.codice,
+                "fermata": self.fermata, "esito": self.esito,
                 "sessione": self.sessione, "rifai": self.rifai, "log": list(self.log)[-60:], **self.stima()}
 
 
 LAVORO = Lavoro()
 
 
-def avvisa_fine(tipo: str, codice: int) -> None:
-    """Suono e notifica di macOS quando un'elaborazione finisce (non se l'ha fermata l'utente)."""
-    if codice == -signal.SIGTERM:
-        return
-    if codice == 0 and tipo == "descrizioni":
-        suono, testo = CARTELLA / "suono_fine.wav", "Analisi del film completata."
-    elif codice == 0 and tipo == "volti":
-        suono, testo = Path("/System/Library/Sounds/Glass.aiff"), "Descrizioni aggiornate con i nomi dei volti."
-    elif codice == 0 and tipo == "correzione":
-        suono, testo = Path("/System/Library/Sounds/Glass.aiff"), "Scena aggiornata con la tua correzione."
-    elif codice == 0:
-        suono, testo = Path("/System/Library/Sounds/Glass.aiff"), "Volti pronti: controlla i nomi."
+def _ultimo_errore(log: list) -> str:
+    """La riga che spiega l'errore: di solito l'ultima di un traceback di Python."""
+    righe = [r.strip() for r in log if r.strip() and not r.startswith("@@")]
+    riga = next((r for r in reversed(righe) if re.match(r"^[A-Za-z_.]*(Error|Exception)\b", r)),
+                righe[-1] if righe else "")
+    # Gli errori più comuni, detti in parole semplici (il testo tecnico resta nei dettagli).
+    if m := re.search(r"Command \['(ffprobe|ffmpeg)'.*'([^']+)'\] returned non-zero", riga):
+        return f"ffmpeg non riesce a leggere {Path(m.group(2)).name}: il file è danneggiato o non è un video."
+    if m := re.match(r"FileNotFoundError: .*?'([^']+)'", riga):
+        return f"Non trovo {Path(m.group(1)).name}: è stato spostato o il disco è scollegato."
+    if "Connection refused" in riga or "URLError" in riga:
+        return "Ollama non risponde: forse si è chiuso. Riaprilo (o riavvia il Mac) e rilancia."
+    return re.sub(r"^[A-Za-z_.]*(Error|Exception):\s*", "", riga)
+
+
+def esito_del_lavoro(l) -> dict:
+    """Com'è andata un'elaborazione finita da sola: senza errori, con cose da verificare o interrotta."""
+    titoli = {"descrizioni": "Analisi del film completata", "volti": "Descrizioni aggiornate con i nomi dei volti",
+              "correzione": "Scena aggiornata con la tua correzione"}
+    if l.codice != 0:
+        motivo = _ultimo_errore(list(l.log))
+        return {"stato": "errore", "titolo": "L'elaborazione si è interrotta per un errore",
+                "punti": ([f"Motivo: {motivo}"] if motivo else []) +
+                         ["Il lavoro fatto fin qui è salvato: rilanciandola riprende da dove era arrivata.",
+                          "I dettagli sono in «Dettagli dell'elaborazione»."]}
+    punti = list(dict.fromkeys(l.avvisi))
+    if l.tipo == "descrizioni":
+        try:
+            p = json.loads(_file_sessione(l.sessione).read_text())
+            proposti = sum(1 for g in leggi_gruppi(_lavoro(p))
+                           if g.get("nome") and not g.get("confermato") and g["nome"] != "comparsa")
+        except (OSError, ValueError):
+            proposti = 0
+        if proposti:
+            punti.append(f"Vertov ha dato un nome a {proposti} persone da solo: controlla i volti per confermarli.")
+    return {"stato": "verifica" if punti else "ok", "titolo": titoli.get(l.tipo, "Volti pronti: controlla i nomi"),
+            "punti": punti}
+
+
+def avvisa_fine(esito: dict) -> None:
+    """Suono e notifica di macOS quando un'elaborazione finisce da sola (non se l'ha fermata l'utente).
+    Nella finestra di Vertov compare poi il riquadro con l'esito, da chiudere con OK."""
+    if esito["stato"] == "errore":
+        suono = Path("/System/Library/Sounds/Basso.aiff")
+    elif esito["titolo"].startswith("Analisi"):
+        suono = CARTELLA / "suono_fine.wav"
     else:
-        suono, testo = Path("/System/Library/Sounds/Basso.aiff"), "L'elaborazione si è interrotta con un errore."
+        suono = Path("/System/Library/Sounds/Glass.aiff")
+    testo = esito["titolo"] + (": ci sono cose da verificare." if esito["stato"] == "verifica" else ".")
     subprocess.Popen(["afplay", str(suono)])
-    subprocess.Popen(["osascript", "-e", f'display notification "{testo}" with title "Vertov"'])
+    subprocess.Popen(["osascript", "-e", f'display notification {json.dumps(testo)} with title "Vertov"'])
 
 
 # --------------------------------------------------------------------------
@@ -542,21 +670,37 @@ def apri_report() -> None:
                           background_color="#f4ede0", text_select=True)
 
 
-def esporta_report(report: Path, progetto: dict):
-    """Copia il report dove sceglie l'utente (finestra di salvataggio nativa)."""
+# Cosa si può esportare: file nella cartella di lavoro e come si chiama, una volta esportato,
+# dopo il nome della sessione.
+ESPORTAZIONI = {
+    "csv": ("inquadrature.csv", "descrizioni.csv"),
+    "resolve": ("marker_resolve.edl", "marker Resolve.edl"),
+    "report": ("report_vertov.html", "report.html"),
+    "dialoghi": ("dialoghi_trascritti.srt", "dialoghi.srt"),
+    "dati": ("inquadrature.jsonl", "dati.jsonl"),
+}
+
+
+def esporta(p: dict, formati: list) -> list:
+    """Copia nella cartella di destinazione i formati scelti, con il nome della sessione."""
     import shutil
-    import webview
-    nome = f"Report Vertov - {progetto.get('nome') or 'film'}.html"
-    tipo = getattr(getattr(webview, "FileDialog", None), "SAVE", None) or webview.SAVE_DIALOG
-    scelto = FINESTRA.create_file_dialog(tipo, save_filename=nome)
-    if not scelto:
-        return None
-    dest = Path(scelto[0] if isinstance(scelto, (list, tuple)) else scelto)
-    if dest.suffix.lower() != ".html":
-        dest = dest.with_suffix(".html")
-    shutil.copyfile(report, dest)
-    subprocess.run(["open", "-R", str(dest)])
-    return str(dest)
+    if not formati:
+        raise RuntimeError("Scegli almeno un tipo di file da esportare.")
+    if not p.get("out"):
+        raise RuntimeError("Scegli prima la cartella in cui esportare.")
+    dest = Path(p["out"])
+    dest.mkdir(parents=True, exist_ok=True)
+    materiali, creati = materiali_di(p), []
+    for f in formati:
+        sorgente, suffisso = ESPORTAZIONI[f]
+        if not (_lavoro(p) / sorgente).exists():
+            raise RuntimeError("Non c'è ancora niente da esportare: prima descrivi il film.")
+        file = dest / f"{nome_per_file(p.get('nome'))} - {suffisso}"
+        if str(file.resolve()) in materiali:  # mai sovrascrivere un materiale
+            raise RuntimeError(f"{file.name} è uno dei materiali della sessione: scegli un'altra cartella.")
+        shutil.copyfile(_lavoro(p) / sorgente, file)
+        creati.append(str(file))
+    return creati
 
 
 def leggi_risultati(out: Path) -> list:
@@ -591,7 +735,7 @@ def inquadrature_della_scena(out: Path, numero: int) -> list:
 
 
 def correggi(progetto: dict, numero: int, testo: str) -> list:
-    out = Path(progetto["out"])
+    out = _lavoro(progetto)
     correzioni = leggi_correzioni(out)
     if testo.strip():
         correzioni[str(numero)] = testo.strip()
@@ -640,7 +784,7 @@ class Gestore(BaseHTTPRequestHandler):
             materiali = [progetto.get(r) for r in riconosci.RUOLI if r not in ("odg", "personaggi")]
             materiali += lista_odg(progetto) + progetto.get("schede", [])
             mancanti = [m for m in materiali if m and not Path(m).exists()]
-            out = Path(progetto.get("out") or "/nonesiste")
+            out = _lavoro(progetto)
             nostra = LAVORO.processo.pid if LAVORO.attivo() else None
             esterne = [{"pid": a["pid"], "film": Path(a["video"]).name if a.get("video") else "",
                         "origine": a.get("origine", "sconosciuta"),
@@ -653,6 +797,7 @@ class Gestore(BaseHTTPRequestHandler):
                         "volti_proposti": sum(1 for g in leggi_gruppi(out) if g.get("nome") and not g.get("confermato")
                                               and g["nome"] != "comparsa"),
                         "report_pronto": (out / "report_vertov.html").exists(),
+                        "esportabili": {k: (out / v[0]).exists() for k, v in ESPORTAZIONI.items()},
                         "prerequisiti": prerequisiti(), "personaggi": personaggi})
         elif url.path == "/api/sessioni":
             self._json({"corrente": progetto["id"], "sessioni": elenco_sessioni()})
@@ -662,9 +807,9 @@ class Gestore(BaseHTTPRequestHandler):
         elif url.path == "/api/pulizia":
             self._json({"voci": pulizia.voci(MODELLO)})
         elif url.path == "/api/volti":
-            self._json(leggi_gruppi(Path(progetto["out"])) if progetto.get("out") else [])
+            self._json(leggi_gruppi(_lavoro(progetto)))
         elif url.path == "/api/risultati":
-            self._json(leggi_risultati(Path(progetto["out"])) if progetto.get("out") else [])
+            self._json(leggi_risultati(_lavoro(progetto)))
         elif url.path == "/aiuto":
             corpo = (CARTELLA / "aiuto.html").read_bytes()
             self.send_response(200)
@@ -673,7 +818,7 @@ class Gestore(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(corpo)
         elif url.path == "/report":
-            report = Path(progetto.get("out", "/nonesiste")) / "report_vertov.html"
+            report = _lavoro(progetto) / "report_vertov.html"
             if not report.exists():
                 self.send_error(404)
                 return
@@ -684,9 +829,9 @@ class Gestore(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(corpo)
         elif url.path == "/img":
-            # Solo immagini dentro la cartella dei risultati.
+            # Solo immagini dentro la cartella di lavoro.
             rel = parse_qs(url.query).get("p", [""])[0]
-            out = Path(progetto.get("out", "/nonesiste")).resolve()
+            out = _lavoro(progetto).resolve()
             percorso = (out / "volti" / rel).resolve()
             if out not in percorso.parents or percorso.suffix != ".jpg" or not percorso.exists():
                 self.send_error(404)
@@ -728,11 +873,12 @@ class Gestore(BaseHTTPRequestHandler):
             elif url.path == "/api/progetto":
                 progetto.update({k: v for k, v in dati.items() if k in CAMPI_FILE + ["trascrivi", "modello", "nome"]})
                 if dati.get("video") and not progetto.get("out"):
-                    # Cartella dei risultati proposta accanto al video.
-                    video = Path(dati["video"])
-                    progetto["out"] = str(video.parent / f"Vertov - {video.stem}")
+                    # Le esportazioni vanno, se non si sceglie altro, accanto al video.
+                    progetto["out"] = str(Path(dati["video"]).parent)
                 if dati.get("video") and progetto.get("nome") in ("", "Nuova sessione"):
                     progetto["nome"] = Path(dati["video"]).stem
+                if dati.get("video"):
+                    cartella_lavoro(progetto)
                 salva_progetto(progetto)
                 self._json({"ok": True, "progetto": progetto})
             elif url.path == "/api/sessione":
@@ -751,11 +897,10 @@ class Gestore(BaseHTTPRequestHandler):
                 elif azione == "salva":
                     if dati.get("nome", "").strip():
                         progetto["nome"] = dati["nome"].strip()
+                        rinomina_cartella_lavoro(progetto)
                     salva_progetto(progetto)
                 self._json({"ok": True, "progetto": progetto})
             elif url.path == "/api/correggi":
-                if not progetto.get("out"):
-                    raise RuntimeError("Nessuna cartella dei risultati.")
                 scena = correggi(progetto, int(dati["numero"]), dati.get("testo", ""))
                 self._json({"ok": True, "inquadrature": scena})
             elif url.path == "/api/personaggi":
@@ -763,9 +908,8 @@ class Gestore(BaseHTTPRequestHandler):
                 file_personaggi(progetto).write_text(dati.get("testo", ""), encoding="utf-8")
                 self._json({"ok": True})
             elif url.path == "/api/avvia":
-                mancano = [c for c in ("video", "out") if not progetto.get(c)]
-                if mancano:
-                    raise RuntimeError("Mancano il video o la cartella dei risultati.")
+                if not progetto.get("video"):
+                    raise RuntimeError("Manca il video.")
                 if not Path(progetto["video"]).exists():
                     raise RuntimeError("Il video non si trova più: trascinalo di nuovo in Materiali.")
                 LAVORO.avvia(comando(progetto, dati.get("fase") == "volti"), dati.get("fase", ""), progetto["id"],
@@ -781,7 +925,7 @@ class Gestore(BaseHTTPRequestHandler):
                 os.kill(pid, signal.SIGTERM)
                 self._json({"ok": True})
             elif url.path == "/api/nomi":
-                out = Path(progetto["out"])
+                out = _lavoro(progetto)
                 prima = {g["gruppo"]: g for g in leggi_gruppi(out)}
                 salva_nomi(out, dati.get("nomi", {}))
                 # Le inquadrature dove compare un volto rinominato vengono ridescritte con il nome giusto.
@@ -793,14 +937,21 @@ class Gestore(BaseHTTPRequestHandler):
                     LAVORO.avvia(comando(progetto, rifai=da_rifare), "volti", progetto["id"], da_rifare, assenti(progetto))
                 self._json({"ok": True, "cambiati": cambiati, "inquadrature": da_rifare})
             elif url.path == "/api/report":
-                report = Path(progetto.get("out", "")) / "report_vertov.html"
-                if not report.exists():
+                if not (_lavoro(progetto) / "report_vertov.html").exists():
                     raise RuntimeError("Il report non c'è ancora: viene creato alla fine dell'analisi.")
-                if dati.get("azione") == "esporta":
-                    self._json({"percorso": esporta_report(report, progetto)})
-                else:
-                    apri_report()
-                    self._json({"ok": True})
+                apri_report()
+                self._json({"ok": True})
+            elif url.path == "/api/esporta":
+                if dati.get("cartella"):
+                    progetto["out"] = dati["cartella"]
+                progetto["formati"] = [f for f in dati.get("formati", []) if f in ESPORTAZIONI]
+                creati = esporta(progetto, progetto["formati"])
+                progetto["esportati"] = sorted(set(progetto.get("esportati", [])) | set(creati))
+                salva_progetto(progetto)
+                self._json({"ok": True, "creati": creati, "cartella": progetto["out"]})
+            elif url.path == "/api/esito-visto":
+                LAVORO.esito = None
+                self._json({"ok": True})
             elif url.path == "/api/aggiornamenti":
                 azione = dati.get("azione")
                 if azione == "controlla":
@@ -831,13 +982,16 @@ class Gestore(BaseHTTPRequestHandler):
                     raise RuntimeError("Aspetta che finisca il lavoro in corso prima di liberare spazio.")
                 self._json({"liberati": pulizia.cancella(dati.get("chiavi") or [], MODELLO)})
             elif url.path == "/api/apri":
-                out = Path(progetto["out"])
-                bersagli = {"csv": out / "inquadrature.csv", "cartella": out,
-                            "resolve": out / "marker_resolve.edl"}
-                b = bersagli[dati.get("cosa", "cartella")]
-                if not b.exists():
-                    raise RuntimeError("Il file non esiste ancora.")
-                subprocess.run(["open", "-R", str(b)] if dati.get("cosa") == "resolve" else ["open", str(b)])
+                # La cartella di destinazione, con selezionati i file appena esportati, o quella di lavoro.
+                creati = [x for x in dati.get("file", []) if x in progetto.get("esportati", []) and Path(x).exists()]
+                if dati.get("cosa") == "lavoro":
+                    subprocess.run(["open", str(cartella_lavoro(progetto))])
+                elif creati:
+                    subprocess.run(["open", "-R", *creati])
+                elif progetto.get("out") and Path(progetto["out"]).is_dir():
+                    subprocess.run(["open", progetto["out"]])
+                else:
+                    raise RuntimeError("La cartella di destinazione non esiste.")
                 self._json({"ok": True})
             else:
                 self.send_error(404)
@@ -922,10 +1076,8 @@ def crea_menu() -> list:
             MenuAction("Aggiungi una cartella…", _js("aggiungi-cartella")),
             MenuSeparator(),
             MenuAction("Apri il report", _js("report-apri")),
-            MenuAction("Esporta il report…", _js("report-esporta")),
-            MenuAction("Apri il foglio di calcolo", _js("csv")),
-            MenuAction("Mostra i marker per Resolve", _js("resolve")),
-            MenuAction("Apri la cartella dei risultati", _js("cartella")),
+            MenuAction("Esporta…", _js("esporta")),
+            MenuAction("Mostra i file di lavoro", _js("lavoro")),
             MenuSeparator(),
             MenuAction("Libera spazio…", _js("pulizia")),
         ]),
@@ -953,7 +1105,7 @@ def crea_menu() -> list:
 # Scorciatoie da tastiera dei menu: titolo -> (tasto, maiuscole)
 SCORCIATOIE = {
     "Nuova sessione": ("n", False), "Apri sessione…": ("o", False), "Salva sessione": ("s", False),
-    "Aggiungi materiali…": ("o", True), "Esporta il report…": ("e", False), "Materiali": ("1", False),
+    "Aggiungi materiali…": ("o", True), "Esporta…": ("e", False), "Materiali": ("1", False),
     "Risultato": ("2", False), "Controlla i volti…": ("3", False), "Descrivi il film": ("r", False),
     "Ferma": (".", False), "Guida di Vertov": ("?", False),
 }
@@ -1034,6 +1186,7 @@ def main():
                         '(first process whose name is "Vertov" or name is "Python") to true'],
                        capture_output=True)
         return
+    trasloca_tutte()  # i file di lavoro lasciati dalle versioni precedenti nelle cartelle dei risultati
     threading.Thread(target=server.serve_forever, daemon=True).start()
     identita_mac()
     FINESTRA = webview.create_window(

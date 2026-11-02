@@ -16,6 +16,11 @@ def fase(nome: str) -> None:
             REGISTRO.finita = True
 
 
+def avviso(testo: str) -> None:
+    """Una cosa da verificare: l'app la elenca nel riquadro che compare a fine lavoro."""
+    print(f"@@avviso {testo}", flush=True)
+
+
 def avanzamento(nome: str, fatti: int, totale: int) -> None:
     # Al massimo circa 200 aggiornamenti per fase, per non intasare l'uscita.
     if totale <= 200 or fatti % max(1, totale // 200) == 0 or fatti == totale:

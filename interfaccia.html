@@ -235,8 +235,26 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 .avvio > div { flex: 1; min-width: 260px; font-size: 13.5px; color: var(--tenue); }
 .avvio b { color: var(--inchiostro); font-family: var(--serif); font-size: 16px; font-weight: 500; margin-right: 4px; }
 .bottone.grande { font-size: 17px; padding: 12px 26px; }
-.esporta { margin-top: 10px; }
-.etichetta-esporta { font: italic 14px var(--serif); color: var(--tenue); }
+.esporta { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--linea); border-radius: 12px; background: var(--fondo, var(--carta)); }
+.esporta h3 { margin: 0 0 2px; font: 500 18px/1.3 var(--serif); }
+.esporta .spiega { margin: 0 0 8px; }
+.formati { display: grid; gap: 2px; }
+.formato { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; align-items: baseline; padding: 6px 0; font-size: 14px; cursor: pointer; }
+.formato input { margin: 0; }
+.formato .spiega-formato { grid-column: 2; font-size: 12.5px; color: var(--tenue); overflow-wrap: anywhere; }
+.formato.assente { opacity: .45; cursor: default; }
+.esporta .riga-azioni { margin-top: 10px; }
+.esito-esporta { font-size: 13px; color: var(--tenue); }
+.esito-esporta button { margin-left: 6px; }
+/* esito di un lavoro finito */
+#finestra-esito .foglio { width: min(520px, 100%); }
+#finestra-esito .foglio-testa { border-bottom: 0; padding-bottom: 0; display: flex; gap: 12px; align-items: flex-start; }
+.icona-esito { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 18px; color: var(--carta); margin-top: 2px; }
+.icona-esito.ok { background: var(--ok); } .icona-esito.verifica { background: var(--avviso); } .icona-esito.errore { background: var(--rosso); }
+#esito-titolo { margin: 0; font: 500 21px/1.3 var(--serif); }
+#esito-sotto { margin: 2px 0 0; font-size: 13.5px; color: var(--tenue); }
+#esito-punti { margin: 6px 0 0; padding-left: 20px; font-size: 14px; display: grid; gap: 6px; overflow-wrap: anywhere; }
+#esito-punti:empty { display: none; }
 .avviso-volti { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--ocra) 14%, var(--pannello)); font-size: 13.5px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 /* finestra dei volti */
 .velo { position: fixed; inset: 0; background: rgba(31, 30, 37, .45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -345,7 +363,7 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
       <div class="esito-arrivo" id="esito-arrivo" aria-live="polite"></div>
       <div class="scartati" id="scartati"></div>
       <label class="spunta"><input type="checkbox" id="trascrivi"> Senza trascrizione: trascrivi i dialoghi con Whisper</label>
-      <div class="cartella-risultati"><span>I risultati vanno in</span> <span class="percorso" id="percorso-out"></span> <button class="bottone piccolo" id="cambia-out">Cambia…</button></div>
+      <div class="cartella-risultati"><span>I file con cui Vertov lavora stanno in</span> <span class="percorso" id="percorso-lavoro"></span> <button class="bottone piccolo" data-comando="lavoro">Mostra</button></div>
       <div class="avvio">
         <div><b>Pronto?</b> Vertov fa tutto da solo: avvia Ollama e scarica il modello se serve, trascrive i dialoghi, riconosce i volti e dà loro un nome, descrive ogni inquadratura e scrive il report. Alla fine potrai controllare i volti, se vuoi.</div>
         <button class="bottone primario grande" data-comando="descrivi">Descrivi il film</button>
@@ -365,13 +383,16 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
         <span style="flex:1"></span>
         <button class="bottone" id="apri-volti" disabled title="Disponibile dopo l'analisi">Controlla i volti…</button>
       </div>
-      <div class="riga-azioni esporta">
-        <span class="etichetta-esporta">Esporta</span>
-        <button class="bottone piccolo" data-comando="report-apri" id="apri-report" disabled>Report</button>
-        <button class="bottone piccolo" data-comando="report-esporta" id="esporta-report" disabled>Salva il report…</button>
-        <button class="bottone piccolo" data-apri="csv">Foglio di calcolo</button>
-        <button class="bottone piccolo" data-apri="resolve" title="In Resolve: Timeline › Import › Timeline Markers from EDL">Marker per Resolve</button>
-        <button class="bottone piccolo" data-apri="cartella">Cartella</button>
+      <div class="esporta" id="esporta">
+        <h3>Esporta</h3>
+        <p class="spiega">Scegli i file che ti servono e premi <em>Esporta</em>: prendono il nome della sessione. Puoi riesportare quando vuoi, per esempio dopo una correzione.</p>
+        <div class="formati" id="formati"></div>
+        <div class="cartella-risultati"><span>Nella cartella</span> <span class="percorso" id="percorso-out"></span> <button class="bottone piccolo" id="cambia-out">Cambia…</button></div>
+        <div class="riga-azioni">
+          <button class="bottone primario" id="esegui-esporta" disabled>Esporta</button>
+          <button class="bottone" data-comando="report-apri" id="apri-report" disabled>Apri il report</button>
+          <span class="esito-esporta" id="esito-esporta" aria-live="polite"></span>
+        </div>
       </div>
       <div class="avviso" id="avviso"></div>
       <div class="totale" id="totale" hidden>
@@ -425,6 +446,21 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
       <span class="pulizia-totale" id="pulizia-totale"></span>
       <button class="bottone" id="pulizia-annulla">Annulla</button>
       <button class="bottone primario" id="pulizia-cancella">Cancella</button>
+    </div>
+  </div>
+</div>
+
+<!-- Esito di un lavoro finito: resta finché non si preme OK -->
+<div class="velo" id="finestra-esito" hidden role="alertdialog" aria-modal="true" aria-labelledby="esito-titolo" aria-describedby="esito-sotto">
+  <div class="foglio">
+    <div class="foglio-testa">
+      <div class="icona-esito" id="esito-icona" aria-hidden="true"></div>
+      <div><h2 id="esito-titolo"></h2><p id="esito-sotto"></p></div>
+    </div>
+    <div class="foglio-corpo"><ul id="esito-punti"></ul></div>
+    <div class="foglio-piede">
+      <button class="bottone" id="esito-volti" hidden>Controlla i volti…</button>
+      <button class="bottone primario" id="esito-ok">OK</button>
     </div>
   </div>
 </div>
@@ -645,6 +681,10 @@ function disegnaCampi() {
   const out = $("#percorso-out");
   out.textContent = progetto.out || "verrà proposta accanto al video";
   out.classList.toggle("vuoto", !progetto.out);
+  const lavoro = $("#percorso-lavoro");
+  lavoro.textContent = progetto.cartella_lavoro ? progetto.cartella_lavoro.split("/").slice(-2).join(" › ") : "una cartella per sessione, creata quando aggiungi il video";
+  lavoro.title = progetto.cartella_lavoro || "";
+  lavoro.classList.toggle("vuoto", !progetto.cartella_lavoro);
   segnaScorrimento();
 }
 function controlliRuolo(percorso, ruolo) {
@@ -692,7 +732,7 @@ document.querySelectorAll("[data-sfoglia]").forEach(b => b.onclick = async () =>
   } catch (e) { testo($("#esito-arrivo"), e.message); }
 });
 $("#cambia-out").onclick = async () => {
-  const { percorso } = await api("/api/scegli", { tipo: "cartella", messaggio: "Cartella dei risultati" });
+  const { percorso } = await api("/api/scegli", { tipo: "cartella", messaggio: "Cartella in cui esportare" });
   if (!percorso) return;
   const r = await api("/api/progetto", { out: percorso });
   progetto = r.progetto; personaggiCaricati = false;
@@ -810,8 +850,8 @@ async function vertovComando(nome) {
       case "aggiungi-file": mostraScheda("materiali"); return clic('[data-sfoglia="file"]');
       case "aggiungi-cartella": mostraScheda("materiali"); return clic('[data-sfoglia="cartella"]');
       case "report-apri": await api("/api/report", {}); return;
-      case "report-esporta": { const r = await api("/api/report", { azione: "esporta" }); if (r.percorso) testo($("#avviso"), "Report salvato in " + r.percorso); return; }
-      case "csv": case "resolve": case "cartella": await api("/api/apri", { cosa: nome }); return;
+      case "esporta": mostraScheda("risultato"); $("#esporta").scrollIntoView({ behavior: "smooth", block: "center" }); $("#esegui-esporta").focus(); return;
+      case "lavoro": await api("/api/apri", { cosa: "lavoro" }); return;
       case "vista-materiali": return mostraScheda("materiali");
       case "vista-risultato": return mostraScheda("risultato");
       case "dettagli": mostraScheda("risultato"); document.querySelector("details.log").open = true; return;
@@ -912,8 +952,74 @@ function apriCorrezione(r, cella, tr) {
   }
 }
 
-document.querySelectorAll("[data-apri]").forEach(b => b.onclick = async () => {
-  try { await api("/api/apri", { cosa: b.dataset.apri }); } catch (e) { testo($("#avviso"), e.message); }
+// Esportazione: i formati scelti, con il nome della sessione, nella cartella di destinazione.
+const FORMATI = {
+  csv: ["Foglio di calcolo", "descrizioni.csv", "Le descrizioni di ogni inquadratura, per Excel, Numbers o Google Fogli."],
+  resolve: ["Marker per DaVinci Resolve", "marker Resolve.edl", "In Resolve: Timeline › Import › Timeline Markers from EDL."],
+  report: ["Report", "report.html", "Si apre nel browser; da lì puoi salvarlo in PDF."],
+  dialoghi: ["Trascrizione dei dialoghi", "dialoghi.srt", "Sottotitoli con i dialoghi trascritti da Whisper."],
+  dati: ["Dati completi", "dati.jsonl", "Tutto ciò che Vertov sa di ogni inquadratura, per altri programmi."],
+};
+const FORMATI_PREDEFINITI = ["csv", "resolve", "report"];
+let esportabili = {}, firmaFormati = "";
+function nomeSessioneFile(t) { return (t || "").replace(/[\\/:\x00-\x1f]/g, "-").replace(/^[ .]+|[ .]+$/g, "") || "Sessione"; }
+function disegnaFormati() {
+  const scelti = progetto.formati || FORMATI_PREDEFINITI;
+  const firma = JSON.stringify([esportabili, scelti, progetto.nome]);
+  if (firma === firmaFormati) return statoEsporta();
+  firmaFormati = firma;
+  $("#formati").replaceChildren(...Object.entries(FORMATI).map(([chiave, [nome, suffisso, spiega]]) => {
+    const pronto = !!esportabili[chiave];
+    const etichetta = crea("label", "formato" + (pronto ? "" : " assente"));
+    const cb = crea("input"); cb.type = "checkbox"; cb.value = chiave; cb.disabled = !pronto;
+    cb.checked = pronto && scelti.includes(chiave);
+    cb.onchange = statoEsporta;
+    const titolo = crea("span"); titolo.append(crea("b", "", nome), ` · ${nomeSessioneFile(progetto.nome)} - ${suffisso}`);
+    etichetta.append(cb, titolo, crea("span", "spiega-formato",
+      pronto ? spiega : chiave === "dialoghi" && esportabili.csv ? "Non c'è: i dialoghi non sono stati trascritti da Vertov." : "Sarà disponibile dopo l'analisi."));
+    return etichetta;
+  }));
+  statoEsporta();
+}
+function formatiScelti() { return [...document.querySelectorAll("#formati input:checked")].map(c => c.value); }
+function statoEsporta() { $("#esegui-esporta").disabled = !formatiScelti().length || (ultimoLavoro && ultimoLavoro.attivo); }
+$("#esegui-esporta").onclick = async () => {
+  const esito = $("#esito-esporta");
+  testo(esito, "");
+  try {
+    const r = await api("/api/esporta", { formati: formatiScelti() });
+    progetto.formati = formatiScelti(); progetto.esportati = r.creati;
+    esito.replaceChildren(`Esportat${r.creati.length === 1 ? "o 1 file" : "i " + r.creati.length + " file"} in ${r.cartella.split("/").pop()}.`);
+    const mostra = crea("button", "bottone piccolo", "Mostra nel Finder");
+    mostra.onclick = () => api("/api/apri", { file: r.creati }).catch(e => testo(esito, e.message));
+    esito.appendChild(mostra);
+  } catch (e) { testo(esito, e.message); }
+};
+
+// Riquadro con l'esito di un lavoro finito: compare finché non si preme OK.
+let esitoMostrato = null;
+function mostraEsito(e) {
+  const firma = JSON.stringify(e);
+  if (!e || firma === esitoMostrato) return;
+  esitoMostrato = firma;
+  const icone = { ok: "✓", verifica: "!", errore: "×" };
+  const sotto = { ok: "Tutto è andato a buon fine, senza errori.", verifica: "Il lavoro è finito, ma ci sono cose da verificare:", errore: "" };
+  const icona = $("#esito-icona"); icona.className = "icona-esito " + e.stato; icona.textContent = icone[e.stato];
+  testo($("#esito-titolo"), e.stato === "verifica" ? e.titolo + ", con cose da verificare" : e.titolo);
+  testo($("#esito-sotto"), sotto[e.stato]);
+  $("#esito-punti").replaceChildren(...e.punti.map(p => crea("li", "", p)));
+  $("#esito-volti").hidden = !e.punti.some(p => p.includes("controlla i volti"));
+  $("#finestra-esito").hidden = false;
+  $("#esito-ok").focus();
+}
+async function chiudiEsito() {
+  $("#finestra-esito").hidden = true;
+  try { await api("/api/esito-visto", {}); } catch { /* il server si sta chiudendo */ }
+}
+$("#esito-ok").onclick = chiudiEsito;
+$("#esito-volti").onclick = async () => { await chiudiEsito(); apriVolti(); };
+document.addEventListener("keydown", e => {
+  if (!$("#finestra-esito").hidden && (e.key === "Escape" || e.key === "Enter")) { e.preventDefault(); chiudiEsito(); }
 });
 
 async function avvia(fase) {
@@ -1024,7 +1130,10 @@ async function aggiorna(subito) {
   // I volti si controllano solo a lavoro finito; il report c'è dopo la prima analisi completa.
   $("#apri-volti").disabled = !s.volti_pronti || l.attivo;
   $("#apri-volti").title = s.volti_pronti ? "" : "Disponibile dopo l'analisi";
-  $("#apri-report").disabled = $("#esporta-report").disabled = !s.report_pronto;
+  $("#apri-report").disabled = !s.report_pronto;
+  esportabili = s.esportabili || {};
+  disegnaFormati();
+  if (s.lavoro.esito && s.lavoro.sessione === progetto.id) mostraEsito(s.lavoro.esito);
   const avvisoVolti = $("#avviso-volti");
   avvisoVolti.hidden = !(s.volti_proposti > 0 && !l.attivo);
   if (!avvisoVolti.hidden && avvisoVolti.dataset.n !== String(s.volti_proposti)) {
@@ -1042,11 +1151,11 @@ async function aggiorna(subito) {
     // Un'elaborazione è appena finita: si aggiornano volti e risultati.
     caricaVolti(); caricaRisultati();
     const dove = $("#avviso");
-    if (l.codice && l.codice !== 0 && l.codice !== -15) testo(dove, "L'elaborazione si è interrotta con un errore: guarda i dettagli dell'elaborazione.");
-    else if (l.codice === -15) testo(dove, "Elaborazione fermata. Puoi riprenderla quando vuoi.");
+    if (l.fermata) testo(dove, "Elaborazione fermata. Puoi riprenderla quando vuoi.");
+    else if (l.codice) testo(dove, "L'elaborazione si è interrotta con un errore: guarda i dettagli dell'elaborazione.");
     else if (l.tipo === "volti") testo(dove, "Descrizioni aggiornate con i nomi dei volti.");
     else if (l.tipo === "correzione") testo(dove, "Scena aggiornata con la tua correzione.");
-    else if (l.tipo === "descrizioni") testo(dove, "Analisi completata. Il report è pronto: lo trovi in Esporta.");
+    else if (l.tipo === "descrizioni") testo(dove, "Analisi completata. Scegli cosa esportare qui sotto.");
     statoVolti();
   } else if (l.attivo && l.avanzamento.descrizioni) {
     const n = l.avanzamento.descrizioni.fatti;

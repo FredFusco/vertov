@@ -195,6 +195,7 @@ def _nomi_dal_modello(gruppi: dict, candidati: dict, schede: dict, modello: str,
                 risposta = json.loads(json.load(r)["message"]["content"])
         except Exception as e:  # il riconoscimento dei volti non deve fermare il lavoro
             print(f"  {g}: il modello non ha risposto ({e})")
+            progresso.avviso(f"Il volto {g} è rimasto senza nome: il modello non ha risposto.")
             continue
         nome = next((n for n in nomi if n.lower() == risposta["nome"].strip().lower()), None)
         if nome:

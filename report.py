@@ -98,6 +98,7 @@ def sinossi_scene(scene: list, modello: str, cache_file: Path) -> dict:
                 sinossi = json.loads(json.load(r)["message"]["content"])["sinossi"].strip()
         except Exception as e:
             print(f"Sinossi della scena {chiave} non riuscita: {e}")
+            progresso.avviso(f"Sinossi della scena {chiave} non scritta: il modello non ha risposto.")
             sinossi = ""
         risultato[chiave] = sinossi
         if sinossi:

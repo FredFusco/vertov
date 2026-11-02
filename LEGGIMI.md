@@ -58,6 +58,10 @@ Se interrompi l'elaborazione, rilanciando lo stesso comando riparte da dove si e
 
 ## Risultati (nella cartella `--out`)
 
+Dall'app, `--out` è la cartella di lavoro della sessione (`~/My Drive/CLAUDE/Vertov – file di lavoro/<sessione>`, o `~/Library/Application Support/Vertov/Vertov – file di lavoro` se quella cartella non c'è): l'utente non la vede. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app sposta nella cartella di lavoro i file che le versioni precedenti lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
+
+A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi `progresso.py`); l'app le mostra nel riquadro dell'esito insieme all'eventuale errore.
+
 - `inquadrature.csv`: si apre in Excel. Una riga per inquadratura con piano, movimento di macchina, personaggi, azione, ambiente, luce, dialoghi, battute del copione, sonoro, suoni rilevati e descrizione
 - `inquadrature.jsonl`: gli stessi dati in formato completo, compresi volti riconosciuti e livelli audio
 - `marker_resolve.edl`: in DaVinci Resolve, *Timeline > Import > Timeline Markers from EDL* mette ogni descrizione come marker sulla timeline
