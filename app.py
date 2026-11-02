@@ -1108,6 +1108,7 @@ def crea_menu() -> list:
         Menu("Vista", [
             MenuAction("Materiali", _js("vista-materiali")),
             MenuAction("Risultato", _js("vista-risultato")),
+            MenuAction("Esporta", _js("vista-esporta")),
             MenuSeparator(),
             MenuAction("Controlla i volti…", _js("volti")),
             MenuAction("Dettagli dell'elaborazione", _js("dettagli")),
@@ -1130,7 +1131,7 @@ def crea_menu() -> list:
 SCORCIATOIE = {
     "Nuova sessione": ("n", False), "Apri sessione…": ("o", False), "Salva sessione": ("s", False),
     "Aggiungi materiali…": ("o", True), "Esporta…": ("e", False), "Materiali": ("1", False),
-    "Risultato": ("2", False), "Controlla i volti…": ("3", False), "Descrivi il film": ("r", False),
+    "Risultato": ("2", False), "Esporta": ("3", False), "Controlla i volti…": ("v", True), "Descrivi il film": ("r", False),
     "Ferma": (".", False), "Guida di Vertov": ("?", False),
 }
 

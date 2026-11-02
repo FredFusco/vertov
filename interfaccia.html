@@ -235,15 +235,13 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 .avvio > div { flex: 1; min-width: 260px; font-size: 13.5px; color: var(--tenue); }
 .avvio b { color: var(--inchiostro); font-family: var(--serif); font-size: 16px; font-weight: 500; margin-right: 4px; }
 .bottone.grande { font-size: 17px; padding: 12px 26px; }
-.esporta { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--linea); border-radius: 12px; background: var(--fondo, var(--carta)); }
-.esporta h3 { margin: 0 0 2px; font: 500 18px/1.3 var(--serif); }
-.esporta .spiega { margin: 0 0 8px; }
 .formati { display: grid; gap: 2px; }
 .formato { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; align-items: baseline; padding: 6px 0; font-size: 14px; cursor: pointer; }
 .formato input { margin: 0; }
 .formato .spiega-formato { grid-column: 2; font-size: 12.5px; color: var(--tenue); overflow-wrap: anywhere; }
 .formato.assente { opacity: .45; cursor: default; }
-.esporta .riga-azioni { margin-top: 10px; }
+#esporta .formati { margin-top: 6px; }
+#esporta .riga-azioni { margin-top: 14px; }
 .esito-esporta { font-size: 13px; color: var(--tenue); }
 .esito-esporta button { margin-left: 6px; }
 /* esito di un lavoro finito */
@@ -320,6 +318,7 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
   <nav class="schede" role="tablist">
     <button role="tab" data-scheda="materiali" aria-selected="true"><span class="numero">1</span> Materiali</button>
     <button role="tab" data-scheda="risultato" aria-selected="false"><span class="numero">2</span> Risultato <span class="in-corso" hidden></span><span class="percento-scheda" id="percento-scheda"></span></button>
+    <button role="tab" data-scheda="esporta" aria-selected="false"><span class="numero">3</span> Esporta</button>
   </nav>
 </header>
 
@@ -371,7 +370,7 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
     </section>
   </div>
 
-  <!-- 3 · RISULTATO -->
+  <!-- 2 · RISULTATO -->
   <div role="tabpanel" id="scheda-risultato" hidden>
     <section class="passo">
       <h2>Descrizioni</h2>
@@ -382,17 +381,6 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
         <button class="bottone" id="ferma" disabled>Ferma</button>
         <span style="flex:1"></span>
         <button class="bottone" id="apri-volti" disabled title="Disponibile dopo l'analisi">Controlla i volti…</button>
-      </div>
-      <div class="esporta" id="esporta">
-        <h3>Esporta</h3>
-        <p class="spiega">Scegli i file che ti servono e premi <em>Esporta</em>: prendono il nome della sessione. Puoi riesportare quando vuoi, per esempio dopo una correzione.</p>
-        <div class="formati" id="formati"></div>
-        <div class="cartella-risultati"><span>Nella cartella</span> <span class="percorso" id="percorso-out"></span> <button class="bottone piccolo" id="cambia-out">Cambia…</button></div>
-        <div class="riga-azioni">
-          <button class="bottone primario" id="esegui-esporta" disabled>Esporta</button>
-          <button class="bottone" data-comando="report-apri" id="apri-report" disabled>Apri il report</button>
-          <span class="esito-esporta" id="esito-esporta" aria-live="polite"></span>
-        </div>
       </div>
       <div class="avviso" id="avviso"></div>
       <div class="totale" id="totale" hidden>
@@ -405,6 +393,20 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
       <div class="fasi" id="fasi"></div>
       <details class="log"><summary>Dettagli dell'elaborazione</summary><pre id="log"></pre></details>
       <div class="contenitore-tabella"><table class="tabella" id="risultati"></table></div>
+    </section>
+  </div>
+  <!-- 3 · ESPORTA -->
+  <div role="tabpanel" id="scheda-esporta" hidden>
+    <section class="passo" id="esporta">
+      <h2>Esporta</h2>
+      <p class="spiega">Scegli i file che ti servono e premi <em>Esporta</em>: prendono il nome della sessione. Puoi riesportare quando vuoi, per esempio dopo una correzione.</p>
+      <div class="formati" id="formati"></div>
+      <div class="cartella-risultati"><span>Nella cartella</span> <span class="percorso" id="percorso-out"></span> <button class="bottone piccolo" id="cambia-out">Cambia…</button></div>
+      <div class="riga-azioni">
+        <button class="bottone primario" id="esegui-esporta" disabled>Esporta</button>
+        <button class="bottone" data-comando="report-apri" id="apri-report" disabled>Apri il report</button>
+        <span class="esito-esporta" id="esito-esporta" aria-live="polite"></span>
+      </div>
     </section>
   </div>
 </main>
@@ -850,7 +852,8 @@ async function vertovComando(nome) {
       case "aggiungi-file": mostraScheda("materiali"); return clic('[data-sfoglia="file"]');
       case "aggiungi-cartella": mostraScheda("materiali"); return clic('[data-sfoglia="cartella"]');
       case "report-apri": await api("/api/report", {}); return;
-      case "esporta": mostraScheda("risultato"); $("#esporta").scrollIntoView({ behavior: "smooth", block: "center" }); $("#esegui-esporta").focus(); return;
+      case "esporta": mostraScheda("esporta"); $("#esegui-esporta").focus(); return;
+      case "vista-esporta": return mostraScheda("esporta");
       case "lavoro": await api("/api/apri", { cosa: "lavoro" }); return;
       case "vista-materiali": return mostraScheda("materiali");
       case "vista-risultato": return mostraScheda("risultato");
@@ -1155,7 +1158,7 @@ async function aggiorna(subito) {
     else if (l.codice) testo(dove, "L'elaborazione si è interrotta con un errore: guarda i dettagli dell'elaborazione.");
     else if (l.tipo === "volti") testo(dove, "Descrizioni aggiornate con i nomi dei volti.");
     else if (l.tipo === "correzione") testo(dove, "Scena aggiornata con la tua correzione.");
-    else if (l.tipo === "descrizioni") testo(dove, "Analisi completata. Scegli cosa esportare qui sotto.");
+    else if (l.tipo === "descrizioni") testo(dove, "Analisi completata. Scegli cosa esportare nella sezione 3 · Esporta.");
     statoVolti();
   } else if (l.attivo && l.avanzamento.descrizioni) {
     const n = l.avanzamento.descrizioni.fatti;
