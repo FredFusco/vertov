@@ -17,6 +17,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+import coordinamento
 import progresso
 
 OLLAMA = "http://localhost:11434"
@@ -74,6 +75,7 @@ def main() -> None:
     separatore = sys.argv.index("--")
     opzioni, resto = sys.argv[1:separatore], sys.argv[separatore + 1:]
     modello = opzioni[opzioni.index("--modello") + 1] if "--modello" in opzioni else "qwen3-vl:30b-a3b-instruct"
+    coordinamento.sorveglia_app()  # anche il download del modello si ferma se l'app non c'è più
     avvia_ollama()
     scarica_modello(modello)
     os.execv(sys.executable, [sys.executable, "-u", *resto])

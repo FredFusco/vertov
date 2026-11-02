@@ -20,6 +20,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+import coordinamento
 import progresso
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
@@ -81,9 +82,9 @@ def sinossi_scene(scene: list, modello: str, cache_file: Path) -> dict:
         progresso.fase("report")
     for i, (chiave, testo, impronta) in enumerate(da_fare, 1):
         corpo = {
-            "model": modello, "stream": False, "think": False, "keep_alive": "30m",
+            "model": modello, "stream": False, "think": False, "keep_alive": coordinamento.TENUTA,
             "format": {"type": "object", "properties": {"sinossi": {"type": "string"}}, "required": ["sinossi"]},
-            "options": {"temperature": 0.2, "num_ctx": 8192},
+            "options": {"temperature": 0.2, "num_ctx": coordinamento.CONTESTO},
             "messages": [{"role": "user", "content":
                           "Ecco le descrizioni, in ordine, delle inquadrature di una scena di un film. "
                           "Scrivi in italiano una sinossi della scena in due o tre frasi: cosa succede e di cosa "

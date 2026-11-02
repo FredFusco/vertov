@@ -69,6 +69,16 @@ Se interrompi l'elaborazione, rilanciando lo stesso comando riparte da dove si e
 
 Su M5 Max servono 12–25 secondi per inquadratura, secondo la durata. Per un film di 2.000 inquadrature sono 7–12 ore: conviene lanciarlo di notte. Il passaggio dei volti richiede pochi minuti.
 
+## Insieme a Murnau e Ozu
+
+Le tre app usano lo stesso modello, Qwen3-VL, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (20 GB) a ogni cambio. Le regole stanno in `coordinamento.py`:
+
+- **Precedenza a Vertov**: Murnau e Ozu riconoscono un'analisi di Vertov dal programma `descrittore_inquadrature/descrivi.py` eseguito da Python, e aspettano. Non rinominare né spostare `descrivi.py` senza aggiornare anche loro.
+- **Un solo contesto**: ogni richiesta di Vertov (descrizioni, volti, report) usa lo stesso contesto (`CONTESTO`, 16384), così Vertov non costringe Ollama a ricaricare il modello nemmeno da solo.
+- **Una sola analisi di Vertov alla volta**; il modello resta in memoria 5 minuti (`TENUTA`) e a fine analisi viene tolto se è la copia di Vertov.
+- **Chiusura vera**: Ferma (e la chiusura della finestra) manda SIGTERM a tutta l'analisi e, dopo 5 secondi, SIGKILL. Un'analisi lanciata dall'app controlla ogni secondo che l'app esista ancora (`VERTOV_APP`) e altrimenti si spegne.
+- **Registro**: ogni analisi scrive `~/Library/Application Support/Vertov/lavori/<pid>.json`; l'app mostra quelle partite da Terminale con un pulsante Ferma.
+
 ## Aggiornamenti e spazio
 
 - `aggiornamenti.py` controlla Vertov (annuncio all'indirizzo in `aggiornamenti.json`), ffmpeg e Ollama (Homebrew), le librerie Python dell'ambiente e i modelli (Ollama, Hugging Face). L'app chiede prima di installare; le librerie tornano alla versione precedente se non si caricano più.

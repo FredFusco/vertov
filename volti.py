@@ -16,6 +16,7 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
+import coordinamento
 import progresso
 
 CARTELLA_MODELLI = Path(os.path.expanduser("~/.cache/descrittore/modelli"))
@@ -182,7 +183,8 @@ def _nomi_dal_modello(gruppi: dict, candidati: dict, schede: dict, modello: str,
             "il nome di un personaggio solo se corrisponde chiaramente; se è un'altra persona "
             "rispondi \"comparsa\", se non puoi deciderlo \"sconosciuto\". Rispondi in italiano.")
         corpo = {"model": modello, "stream": False, "think": False, "format": schema,
-                 "keep_alive": "30m", "options": {"temperature": 0.0},
+                 "keep_alive": coordinamento.TENUTA,
+                 "options": {"temperature": 0.0, "num_ctx": coordinamento.CONTESTO},
                  "messages": [{"role": "user", "content": prompt,
                                "images": [base64.b64encode(i).decode() for i in immagini]}]}
         try:

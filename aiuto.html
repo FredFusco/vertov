@@ -51,6 +51,16 @@ li { margin:4px 0; }
 <h2>Tempi</h2>
 <p>Su un Mac M5 Max servono 12–25 secondi per inquadratura: per un film di 2.000 inquadrature, 7–12 ore. Puoi fermare <kbd>⌘.</kbd> e riprendere quando vuoi.</p>
 
+<h2>Insieme a Murnau e Ozu</h2>
+<p>Le tre app usano lo stesso modello, Qwen3-VL, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (20 GB) a ogni cambio e tutto rallenta. Per questo:</p>
+<ul>
+  <li><b>Vertov ha la precedenza:</b> mentre un'analisi di Vertov è in corso, Murnau e Ozu aspettano e ripartono da soli quando ha finito. Se avvii Vertov mentre un'altra app sta già lavorando, aspetta al massimo che finisca la richiesta in corso.</li>
+  <li><b>Una sola analisi di Vertov alla volta:</b> se ce n'è già una in corso, Vertov non ne avvia un'altra.</li>
+  <li><b>Memoria:</b> Vertov tiene il modello caricato solo 5 minuti dopo l'ultima richiesta e, a fine analisi, lo toglie subito dalla memoria se è la copia caricata da lui.</li>
+  <li><b>Chiusura vera:</b> chiudendo Vertov l'analisi si ferma, insieme a ffmpeg. Se l'app si chiude in modo anomalo (crash, chiusura forzata), l'analisi se ne accorge e si spegne da sola entro un secondo. Rilanciandola riprende da dove era arrivata.</li>
+  <li><b>Niente analisi nascoste:</b> un'analisi lanciata da Terminale compare in cima alla finestra, con il film, da quanto tempo gira, la fase e un pulsante <b>Ferma</b>. All'avvio e alla fine manda una notifica di macOS.</li>
+</ul>
+
 <h2>Componenti e aggiornamenti</h2>
 <p>Per funzionare Vertov usa alcuni componenti gratuiti, installati su questo Mac:</p>
 <ul>

@@ -22,6 +22,7 @@ import urllib.request
 from collections import deque
 
 import aggiornamenti
+import coordinamento
 import pulizia
 import riconosci
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -310,6 +311,9 @@ class Lavoro:
         with self.blocco:
             if self.attivo():
                 raise RuntimeError("C'è già un'elaborazione in corso.")
+            if coordinamento.analisi_in_corso():
+                raise RuntimeError("C'è già un'analisi di Vertov in corso, avviata fuori da questa finestra: due "
+                                   "analisi insieme si rubano il modello a vicenda. Fermala o aspetta che finisca.")
             self.tipo, self.fase, self.avanz, self.codice = tipo, "avvio", {}, None
             self.sessione, self.rifai = sessione, list(rifai)
             self.inizio_fase = {}
@@ -320,7 +324,9 @@ class Lavoro:
             self.processo = subprocess.Popen(
                 cmd, cwd=CARTELLA, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1, start_new_session=True,
-                env={**os.environ, "PYTHONWARNINGS": "ignore", "TQDM_DISABLE": "1"})
+                env={**os.environ, "PYTHONWARNINGS": "ignore", "TQDM_DISABLE": "1",
+                     # l'analisi si spegne da sola se l'app non c'è più (chiusa, forzata, in crash)
+                     coordinamento.VARIABILE_GENITORE: str(os.getpid())})
         threading.Thread(target=self._leggi, daemon=True).start()
 
     def _leggi(self) -> None:
@@ -396,8 +402,21 @@ class Lavoro:
                 "restano": restano}
 
     def ferma(self) -> None:
-        if self.attivo():
-            os.killpg(self.processo.pid, signal.SIGTERM)
+        """Ferma l'analisi e tutto ciò che ha avviato; se entro 5 secondi non è uscita, la chiude d'ufficio."""
+        if not self.attivo():
+            return
+        processo = self.processo
+        try:
+            os.killpg(processo.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+        try:
+            processo.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(processo.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
 
     def stato(self) -> dict:
         avanz = {}
@@ -622,7 +641,14 @@ class Gestore(BaseHTTPRequestHandler):
             materiali += lista_odg(progetto) + progetto.get("schede", [])
             mancanti = [m for m in materiali if m and not Path(m).exists()]
             out = Path(progetto.get("out") or "/nonesiste")
-            self._json({"progetto": progetto, "lavoro": LAVORO.stato(), "mancanti": mancanti,
+            nostra = LAVORO.processo.pid if LAVORO.attivo() else None
+            esterne = [{"pid": a["pid"], "film": Path(a["video"]).name if a.get("video") else "",
+                        "origine": a.get("origine", "sconosciuta"),
+                        "da": time.time() - a["avviata"] if a.get("avviata") else None,
+                        "fase": a.get("fase", ""), "fatti": a.get("fatti", 0), "totale": a.get("totale", 0),
+                        "out": a.get("out", "")}
+                       for a in coordinamento.analisi_in_corso() if a["pid"] != nostra]
+            self._json({"progetto": progetto, "lavoro": LAVORO.stato(), "mancanti": mancanti, "esterne": esterne,
                         "volti_pronti": (out / "volti" / "gruppi_info.json").exists(),
                         "volti_proposti": sum(1 for g in leggi_gruppi(out) if g.get("nome") and not g.get("confermato")
                                               and g["nome"] != "comparsa"),
@@ -747,6 +773,12 @@ class Gestore(BaseHTTPRequestHandler):
                 self._json({"ok": True})
             elif url.path == "/api/ferma":
                 LAVORO.ferma()
+                self._json({"ok": True})
+            elif url.path == "/api/ferma-esterna":
+                pid = int(dati["pid"])
+                if not coordinamento.e_vertov(pid):  # mai fermare un processo che non sia un'analisi di Vertov
+                    raise RuntimeError("Quell'analisi non è più in corso.")
+                os.kill(pid, signal.SIGTERM)
                 self._json({"ok": True})
             elif url.path == "/api/nomi":
                 out = Path(progetto["out"])

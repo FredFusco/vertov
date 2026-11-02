@@ -257,6 +257,14 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 .novita-voce ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--tenue); }
 .agg-avanzamento { margin-top: 12px; font-size: 13px; color: var(--tenue); }
 .agg-avanzamento .barra > div { background: var(--ocra); }
+/* analisi di Vertov in corso fuori da questa finestra */
+.esterne { border: 1px solid var(--avviso); background: color-mix(in srgb, var(--avviso) 10%, var(--pannello)); border-radius: 12px; padding: 12px 16px; margin: 14px 0 0; }
+.esterne h3 { margin: 0 0 4px; font: 500 16px/1.3 var(--serif); }
+.esterne p { margin: 0 0 8px; font-size: 13px; color: var(--tenue); }
+.esterna { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--linea); font-size: 13.5px; }
+.esterna .cosa { flex: 1; min-width: 220px; }
+.esterna .cosa b { display: block; overflow-wrap: anywhere; }
+.esterna .cosa span { color: var(--tenue); font-size: 12.5px; overflow-wrap: anywhere; }
 .riga-stato { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 0; }
 .riga-stato .prerequisiti { margin: 0; }
 .riga-stato .strumenti { margin-left: auto; display: flex; gap: 8px; }
@@ -298,6 +306,12 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 </header>
 
 <main>
+  <div class="esterne" id="esterne" hidden>
+    <h3>Analisi di Vertov in corso fuori da questa finestra</h3>
+    <p>Partita da Terminale o da un'altra sessione: usa il modello e la memoria anche se non la vedi altrove. Puoi lasciarla finire o fermarla.</p>
+    <div id="elenco-esterne"></div>
+  </div>
+
   <!-- 1 · MATERIALI -->
   <div role="tabpanel" id="scheda-materiali">
     <div class="riga-stato">
@@ -958,6 +972,27 @@ function disegnaFasi(l) {
   }
 }
 
+function disegnaEsterne(esterne) {
+  $("#esterne").hidden = !esterne.length;
+  const origini = {terminale: "avviata da Terminale", app: "avviata da un'altra finestra di Vertov", sconosciuta: "avviata fuori dall'app"};
+  $("#elenco-esterne").replaceChildren(...esterne.map(a => {
+    const riga = crea("div", "esterna");
+    const cosa = crea("div", "cosa");
+    const fase = NOMI_FASI[a.fase] || "";
+    const dettagli = [origini[a.origine] || origini.sconosciuta, a.da != null ? `da ${durata(a.da)}` : "",
+      fase ? `fase: ${fase}${a.totale ? ` (${a.fatti} di ${a.totale})` : ""}` : "", a.out ? `risultati in ${a.out}` : ""].filter(Boolean);
+    cosa.append(crea("b", "", a.film || `processo ${a.pid}`), crea("span", "", dettagli.join(" · ")));
+    const ferma = crea("button", "bottone piccolo", "Ferma");
+    ferma.onclick = async () => {
+      if (!confirm(`Fermare l'analisi di ${a.film || "processo " + a.pid}? Rilanciandola riprenderà da dove era arrivata.`)) return;
+      try { await api("/api/ferma-esterna", {pid: a.pid}); ferma.disabled = true; ferma.textContent = "Fermata"; }
+      catch (e) { alert(e.message); }
+    };
+    riga.append(cosa, ferma);
+    return riga;
+  }));
+}
+
 let timer = null;
 async function aggiorna(subito) {
   clearTimeout(timer);
@@ -968,6 +1003,7 @@ async function aggiorna(subito) {
     disegnaCampi(); caricaVolti(); caricaRisultati();
   }
   progetto = s.progetto || {};
+  disegnaEsterne(s.esterne || []);
   const mancantiPrima = JSON.stringify(mancanti);
   mancanti = s.mancanti || [];
   if (JSON.stringify([Object.keys(RUOLI).map(elementiDi), progetto.scartati, progetto.out, progetto.trascrivi]) !== firmaMateriali

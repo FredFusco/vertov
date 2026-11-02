@@ -16,10 +16,12 @@ Con tracce audio separate (stem) e trascrizione automatica dei dialoghi:
 """
 
 import argparse
+import atexit
 import base64
 import csv
 import json
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -31,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import audio
+import coordinamento
 import odg
 import progresso
 import volti as modulo_volti
@@ -705,8 +708,8 @@ def chiedi_al_modello(modello: str, prompt: str, immagini: list, tentativi: int 
         "format": SCHEMA,
         "stream": False,
         "think": False,
-        "keep_alive": "30m",
-        "options": {"temperature": 0.2, "num_ctx": 16384, "repeat_penalty": 1.15},
+        "keep_alive": coordinamento.TENUTA,
+        "options": {"temperature": 0.2, "num_ctx": coordinamento.CONTESTO, "repeat_penalty": 1.15},
     }
     dati = json.dumps(corpo).encode()
     for tentativo in range(1, tentativi + 1):
@@ -801,6 +804,15 @@ def prepara_tracce(args, fps: float, tc_inizio_s: float) -> list:
 # Programma principale
 # --------------------------------------------------------------------------
 
+def chiusura(registro, modello: str, video: Path) -> None:
+    """All'uscita, normale o interrotta: il registro si toglie e il modello non resta in memoria.
+    ffmpeg e gli altri programmi avviati con subprocess.run vengono chiusi da subprocess stesso."""
+    registro.chiudi()
+    if registro.dati["origine"] == "terminale":
+        coordinamento.notifica(f"{'Analisi finita' if registro.finita else 'Analisi interrotta'}: {video.name}")
+    coordinamento.libera_modello(modello)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Descrive ogni inquadratura di un film con un modello locale.")
     ap.add_argument("video", type=Path)
@@ -843,6 +855,16 @@ def main() -> None:
                     "già riconosciuti e le correzioni in correzioni.json")
     args = ap.parse_args()
     avvio = time.time()
+
+    # Ogni analisi si registra, così l'app la vede anche se è partita da Terminale; all'uscita
+    # (anche se interrotta con Ferma, ⌃C o dalla chiusura dell'app) si toglie e libera il modello.
+    registro = progresso.REGISTRO = coordinamento.Registro(str(args.video), str(args.out))
+    atexit.register(chiusura, registro, args.modello, args.video)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    signal.signal(signal.SIGHUP, lambda *_: sys.exit(129))
+    coordinamento.sorveglia_app()
+    if registro.dati["origine"] == "terminale":
+        coordinamento.notifica(f"Analisi avviata da Terminale: {args.video.name}. La vedi e la puoi fermare dall'app.")
     rifai = {int(n) for n in re.split(r"[,\s]+", args.rifai) if n} if args.rifai else set()
 
     fps, durata, tc_file = info_video(args.video)
