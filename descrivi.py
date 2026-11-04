@@ -589,12 +589,18 @@ ordini del giorno o nelle inquadrature vicine.
 - sonoro: cosa si sente (dialoghi, effetti, ambiente, musica e suo carattere), basandoti \
 sull'analisi del sonoro e sulle battute se presenti; se non hai informazioni audio scrivi \
 "non analizzato".
-- dialoghi_riassunto: di cosa parlano i personaggi in questa inquadratura, in una o due frasi \
-con parole tue: RIASSUMI il senso, non citare le battute tra virgolette (es. "Teresa chiede a \
-Paolo se ha già parlato con il padre; Paolo ammette di non averne il coraggio"). Chi dice cosa: \
-usa il personaggio indicato nel copione per ogni battuta ("nel copione TERESA: ..."); per \
-le battute senza corrispondenza nel copione non attribuirle a un personaggio preciso se \
-non è evidente. Se nessuno parla scrivi stringa vuota.
+- dialoghi_riassunto: il contenuto di TUTTE le battute di questa inquadratura, nell'ordine in \
+cui vengono dette, con parole tue: chi dice cosa e che cosa si dicono (domande, risposte, \
+notizie, richieste, promesse). Non fermarti alla prima battuta e non ridurre uno scambio a un \
+gesto: se ci sono più scambi riassumili tutti, anche in tre o quattro frasi se servono (es. \
+"Teresa chiede a Paolo se ha già parlato con il padre; Paolo ammette di non averne il coraggio \
+e le chiede di non dirlo a nessuno; lei promette di tacere"). RIASSUMI: non citare le battute \
+tra virgolette, non scrivere "nel copione" e non riportare tra parentesi il testo del copione. \
+Chi dice cosa: usa il personaggio indicato nel copione per ogni battuta ("nel copione TERESA: \
+..."); per le battute senza corrispondenza nel copione non attribuirle a un personaggio preciso \
+se non è evidente. La trascrizione automatica può contenere errori: una battuta senza senso e \
+senza corrispondenza nel copione va tralasciata, non interpretata. Se nessuno parla scrivi \
+stringa vuota.
 - descrizione: due o tre frasi riassuntive, come in un découpage: cosa succede e, se i \
 personaggi parlano, di cosa parlano (riprendendo dialoghi_riassunto).
 
