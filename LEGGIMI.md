@@ -2,7 +2,7 @@
 
 Descrive ogni inquadratura di un film (immagine e sonoro) usando solo modelli locali e gratuiti:
 
-- **Immagini:** Qwen3-VL 30B tramite Ollama
+- **Immagini:** Gemma 4 26B (`gemma4:26b`) tramite Ollama; il modello si sceglie in `modello.py`
 - **Personaggi:** riconoscimento dei volti dal film stesso (YuNet e SFace di OpenCV), con i nomi dedotti da copione e ordini del giorno
 - **Dialoghi:** Whisper large-v3-turbo (mlx-whisper), solo se non fornisci già una trascrizione; le battute vengono ricollegate al copione
 - **Effetti e musica:** classificatore AST addestrato su AudioSet (riconosce 527 tipi di suono, compreso il carattere della musica)
@@ -52,7 +52,7 @@ Tutti i parametri sono facoltativi tranne il video.
 | `--tc-inizio-audio` | Timecode di inizio degli stem, se non è scritto nei WAV (BWF) |
 | `--offset-dialoghi` | Timecode a cui corrisponde lo 00:00:00 dei sottotitoli |
 | `--da N --a M` | Elabora solo le inquadrature da N a M |
-| `--modello` | Un altro modello Ollama (es. `qwen3-vl:8b` per andare più veloce) |
+| `--modello` | Un altro modello Ollama (es. `qwen3.8:27b`, più ricco ma circa quattro volte più lento) |
 
 Se interrompi l'elaborazione, rilanciando lo stesso comando riparte da dove si era fermata. Per rifare le descrizioni da capo, cancella `inquadrature.jsonl` dalla cartella dei risultati.
 
@@ -71,11 +71,20 @@ A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi
 
 ## Tempi
 
-Su M5 Max servono 12–25 secondi per inquadratura, secondo la durata. Per un film di 2.000 inquadrature sono 7–12 ore: conviene lanciarlo di notte. Il passaggio dei volti richiede pochi minuti.
+Su M5 Max servono circa 6 secondi per inquadratura (descrizione 3–6 s, volti, sonoro e fotogrammi circa 2 s). Per un film di 2.000 inquadrature sono 3–4 ore, più la trascrizione con Whisper. A batteria il processore grafico va a metà velocità. Alla ripresa i volti già trovati si rileggono da `volti/rilevamenti/` e non si richiedono al modello i gruppi già esaminati.
+
+## Il modello
+
+Tutte le richieste al modello di visione (descrizioni, nomi dei volti, sinossi del report) passano da `modello.py`:
+
+- `MODELLO` è l'unico posto dove si sceglie il modello (scelto il 4 novembre 2026 confrontando 15 modelli locali su inquadrature con dialoghi: Gemma 4 26B è stato il più preciso e circa tre volte più veloce di Qwen3-VL).
+- I modelli del motore MLX di Ollama (come `gemma4:26b`) rifiutano lo schema JSON (`format`, errore 501): per loro lo schema va nel testo e la risposta viene ripulita (```json, `<|eot|>`) e controllata campo per campo.
+- Gli errori di rete e le risposte non valide si ritentano; poi `ErroreModello`. Un'inquadratura che fallisce viene saltata e segnalata a fine lavoro; dopo tre di fila l'analisi si ferma (il modello non risponde più).
+- Gli aggiornamenti dei modelli MLX si controllano con l'impronta del registro ricordata al download (`modelli_scaricati` in `aggiornamenti.json` dei dati), perché Ollama li converte e l'impronta locale è diversa.
 
 ## Insieme a Murnau e Ozu
 
-Le tre app usano lo stesso modello, Qwen3-VL, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (20 GB) a ogni cambio. Le regole stanno in `coordinamento.py`:
+Vertov usa Gemma 4, come Ozu e come Murnau per le verifiche, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (16 GB) a ogni cambio. Le regole stanno in `coordinamento.py`:
 
 - **Precedenza a Vertov**: Murnau e Ozu riconoscono un'analisi di Vertov dal programma `vertov/descrivi.py` eseguito da Python, e aspettano. Non rinominare la cartella `vertov` né spostare `descrivi.py` senza aggiornare anche loro (`ALTRI_PROGRAMMI` in murnau/coordinamento.py, `PROGRAMMI_DI_ANALISI` in ozu/motore_locale.py).
 - **Un solo contesto**: ogni richiesta di Vertov (descrizioni, volti, report) usa lo stesso contesto (`CONTESTO`, 16384), così Vertov non costringe Ollama a ricaricare il modello nemmeno da solo.

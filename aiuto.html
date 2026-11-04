@@ -55,10 +55,10 @@ li { margin:4px 0; }
 <p>Ogni film è una sessione: <i>Nuova</i> <kbd>⌘N</kbd>, <i>Apri…</i> <kbd>⌘O</kbd>, <i>Salva</i> <kbd>⌘S</kbd>. Eliminare una sessione non tocca mai i file originali; i file di lavoro e quelli esportati vanno nel Cestino solo se lo scegli.</p>
 
 <h2>Tempi</h2>
-<p>Su un Mac M5 Max servono 12–25 secondi per inquadratura: per un film di 2.000 inquadrature, 7–12 ore. Puoi fermare <kbd>⌘.</kbd> e riprendere quando vuoi.</p>
+<p>Su un Mac M5 Max servono circa 6 secondi per inquadratura, volti e sonoro compresi: per un film di 2.000 inquadrature, 3–4 ore (più la trascrizione dei dialoghi, se la fa Vertov). Tieni il Mac collegato alla corrente: a batteria il processore grafico va a metà velocità. Puoi fermare <kbd>⌘.</kbd> e riprendere quando vuoi: le inquadrature già descritte e i volti già riconosciuti non si rifanno.</p>
 
 <h2>Insieme a Murnau e Ozu</h2>
-<p>Le tre app usano lo stesso modello, Qwen3-VL, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (20 GB) a ogni cambio e tutto rallenta. Per questo:</p>
+<p>Vertov descrive le immagini con Gemma 4, che usano anche Ozu (per tradurre) e Murnau (per le verifiche), ognuna con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (16 GB) a ogni cambio e tutto rallenta. Per questo:</p>
 <ul>
   <li><b>Vertov ha la precedenza:</b> mentre un'analisi di Vertov è in corso, Murnau e Ozu aspettano e ripartono da soli quando ha finito. Se avvii Vertov mentre un'altra app sta già lavorando, aspetta al massimo che finisca la richiesta in corso.</li>
   <li><b>Una sola analisi di Vertov alla volta:</b> se ce n'è già una in corso, Vertov non ne avvia un'altra.</li>
@@ -72,7 +72,7 @@ li { margin:4px 0; }
 <ul>
   <li><b>Programmi:</b> <i>ffmpeg</i>, che legge video e audio ed estrae i fotogrammi, e <i>Ollama</i>, che fa girare il modello di visione. Sono installati con Homebrew.</li>
   <li><b>Librerie Python:</b> pywebview (la finestra), OpenCV (i volti), mlx-whisper (la trascrizione), Transformers e PyTorch (i suoni), pyaaf2 (gli AAF), pypdf (i PDF).</li>
-  <li><b>Modelli di intelligenza artificiale:</b> Qwen3-VL guarda le immagini, Whisper trascrive i dialoghi, AST riconosce i suoni, YuNet e SFace trovano e confrontano i volti.</li>
+  <li><b>Modelli di intelligenza artificiale:</b> Gemma 4 guarda le immagini e scrive descrizioni e sinossi, Whisper trascrive i dialoghi, AST riconosce i suoni, YuNet e SFace trovano e confrontano i volti.</li>
 </ul>
 <p>Una volta al giorno, all'avvio, Vertov controlla se ci sono versioni nuove di questi componenti e di Vertov stesso, e ti chiede se vuoi installarle. Puoi scegliere cosa aggiornare, rimandare o saltare una versione. Per controllare quando vuoi: <i>Vertov › Controlla aggiornamenti…</i> o il pulsante <b>Aggiornamenti…</b>. Se le librerie nuove non funzionano con Vertov, vengono rimesse da sole quelle di prima.</p>
 <p class="nota">Vertov non usa Claude né altri servizi online: Claude è servito solo a scriverlo.</p>

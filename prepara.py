@@ -19,6 +19,7 @@ from pathlib import Path
 
 import coordinamento
 import progresso
+from modello import MODELLO
 
 OLLAMA = "http://localhost:11434"
 
@@ -57,7 +58,7 @@ def scarica_modello(modello: str) -> None:
     if any(m == modello or m.startswith(modello + ":") for m in _modelli()):
         return
     progresso.fase("modello")
-    print(f"Scarico il modello di visione {modello} (una volta sola, circa 20 GB)...", flush=True)
+    print(f"Scarico il modello di visione {modello} (una volta sola, circa 16 GB)...", flush=True)
     corpo = json.dumps({"model": modello, "stream": True}).encode()
     richiesta = urllib.request.Request(f"{OLLAMA}/api/pull", data=corpo, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(richiesta, timeout=None) as r:
@@ -74,7 +75,7 @@ def scarica_modello(modello: str) -> None:
 def main() -> None:
     separatore = sys.argv.index("--")
     opzioni, resto = sys.argv[1:separatore], sys.argv[separatore + 1:]
-    modello = opzioni[opzioni.index("--modello") + 1] if "--modello" in opzioni else "qwen3-vl:30b-a3b-instruct"
+    modello = opzioni[opzioni.index("--modello") + 1] if "--modello" in opzioni else MODELLO
     coordinamento.sorveglia_app()  # anche il download del modello si ferma se l'app non c'è più
     avvia_ollama()
     scarica_modello(modello)

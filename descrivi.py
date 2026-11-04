@@ -26,20 +26,19 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import audio
 import coordinamento
+import modello as modulo_modello
 import odg
 import progresso
 import volti as modulo_volti
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODELLO_PREDEFINITO = "qwen3-vl:30b-a3b-instruct"
+MODELLO_PREDEFINITO = modulo_modello.MODELLO
+FALLIMENTI_DI_FILA = 3   # inquadrature fallite una dopo l'altra: vuol dire che il modello non risponde più
 
 
 # --------------------------------------------------------------------------
@@ -697,32 +696,10 @@ def costruisci_prompt(q: Inquadratura, vicini: list, max_scena: int, sonoro: str
     return "\n".join(parti)
 
 
-def chiedi_al_modello(modello: str, prompt: str, immagini: list, tentativi: int = 3) -> dict:
-    corpo = {
-        "model": modello,
-        "messages": [{
-            "role": "user",
-            "content": prompt,
-            "images": [base64.b64encode(p.read_bytes()).decode() for p in immagini],
-        }],
-        "format": SCHEMA,
-        "stream": False,
-        "think": False,
-        "keep_alive": coordinamento.TENUTA,
-        "options": {"temperature": 0.2, "num_ctx": coordinamento.CONTESTO, "repeat_penalty": 1.15},
-    }
-    dati = json.dumps(corpo).encode()
-    for tentativo in range(1, tentativi + 1):
-        try:
-            req = urllib.request.Request(OLLAMA_URL, data=dati,
-                                         headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=600) as r:
-                risposta = json.load(r)
-            return json.loads(risposta["message"]["content"])
-        except (urllib.error.URLError, json.JSONDecodeError, KeyError) as e:
-            if tentativo == tentativi:
-                raise RuntimeError(f"Il modello non ha risposto correttamente: {e}") from e
-            time.sleep(3)
+def chiedi_al_modello(modello: str, prompt: str, immagini: list) -> dict:
+    """Descrizione di un'inquadratura (solleva modulo_modello.ErroreModello se non arriva)."""
+    return modulo_modello.chiedi(prompt, [base64.b64encode(p.read_bytes()).decode() for p in immagini],
+                                 SCHEMA, modello, temperatura=0.2, repeat_penalty=1.15)
 
 
 # --------------------------------------------------------------------------
@@ -813,7 +790,7 @@ def chiusura(registro, modello: str, video: Path) -> None:
     coordinamento.libera_modello(modello)
 
 
-def main() -> None:
+def argomenti() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Descrive ogni inquadratura di un film con un modello locale.")
     ap.add_argument("video", type=Path)
     ap.add_argument("--edl", type=Path, help="EDL CMX3600 o AAF della timeline (consigliato)")
@@ -853,20 +830,11 @@ def main() -> None:
                     "di controllo e si ferma (per confermare i nomi prima delle descrizioni)")
     ap.add_argument("--rifai", help="rifà solo queste inquadrature (es. \"12,13,14\"), usando i volti "
                     "già riconosciuti e le correzioni in correzioni.json")
-    args = ap.parse_args()
-    avvio = time.time()
+    return ap.parse_args()
 
-    # Ogni analisi si registra, così l'app la vede anche se è partita da Terminale; all'uscita
-    # (anche se interrotta con Ferma, ⌃C o dalla chiusura dell'app) si toglie e libera il modello.
-    registro = progresso.REGISTRO = coordinamento.Registro(str(args.video), str(args.out))
-    atexit.register(chiusura, registro, args.modello, args.video)
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
-    signal.signal(signal.SIGHUP, lambda *_: sys.exit(129))
-    coordinamento.sorveglia_app()
-    if registro.dati["origine"] == "terminale":
-        coordinamento.notifica(f"Analisi avviata da Terminale: {args.video.name}. La vedi e la puoi fermare dall'app.")
-    rifai = {int(n) for n in re.split(r"[,\s]+", args.rifai) if n} if args.rifai else set()
 
+def carica_inquadrature(args) -> tuple:
+    """Video e montaggio: fps, durata, inizio del video in secondi e le inquadrature in ordine."""
     fps, durata, tc_file = info_video(args.video)
     tc_inizio = args.tc_inizio or tc_file or "00:00:00:00"
     tc_inizio_s = tc_a_secondi(tc_inizio, fps)
@@ -884,14 +852,14 @@ def main() -> None:
         inquadrature = rileva_tagli(args.video, durata, fps, tc_inizio_s, args.soglia_tagli)
     print(f"Inquadrature: {len(inquadrature)}")
 
-    tracce = []
-    riconoscitore = None
-    if not args.senza_audio:
-        tracce = prepara_tracce(args, fps, tc_inizio_s)
-        for t in tracce:
-            print(f"Audio {t.tipo}: {t.percorso.name} (spostamento {t.spostamento:+.2f} s)")
+    return fps, durata, tc_inizio_s, inquadrature
 
-    args.out.mkdir(parents=True, exist_ok=True)
+
+def prepara_dialoghi(args, tracce: list, inquadrature: list, scene: list, fps: float, tc_inizio_s: float):
+    """Trascrizione (se serve), battute verificate sulla traccia dialoghi e assegnate alle inquadrature.
+
+    Restituisce il riconoscitore dei suoni, se è stato caricato per verificare le battute."""
+    riconoscitore = None
     if args.trascrivi and not args.dialoghi:
         sorgente = next((t for t in tracce if t.tipo == "dialoghi"), None) or \
             next((t for t in tracce if t.tipo == "mix"), None)
@@ -899,9 +867,7 @@ def main() -> None:
             sys.exit("Per --trascrivi serve un audio: --audio-dialoghi, --audio-mix o un video con audio.")
         srt = args.out / "dialoghi_trascritti.srt"
         if not srt.exists():
-            nomi = []
-            if args.sceneggiatura:
-                nomi = sorted(estrai_personaggi(leggi_sceneggiatura(args.sceneggiatura)))
+            nomi = sorted(estrai_personaggi(scene)) if scene else []
             progresso.fase("trascrizione")
             audio.trascrivi(sorgente, srt, args.lingua, nomi)
         else:
@@ -931,15 +897,19 @@ def main() -> None:
                           if min(b[1], q.fine) - max(b[0], q.inizio) > 0.25 * min(b[1] - b[0], q.fine - q.inizio)]
         print(f"Battute: {len(battute)}")
 
-    if args.sceneggiatura:
-        scene = leggi_sceneggiatura(args.sceneggiatura)
+    return riconoscitore
+
+
+def prepara_copione(args, inquadrature: list, scene: list) -> tuple:
+    """Scena e battute del copione di ogni inquadratura, schede dei personaggi, presenze dagli ODG."""
+    if scene:
         print(f"Scene in sceneggiatura: {len(scene)}")
         abbina_scene(inquadrature, scene)
         allinea_copione(inquadrature, scene)
         abbinate = sum(1 for q in inquadrature for c in q.copione if c)
         print(f"Battute ritrovate nel copione: {abbinate}/{sum(len(q.dialoghi) for q in inquadrature)}")
 
-    personaggi = estrai_personaggi(scene) if args.sceneggiatura else {}
+    personaggi = estrai_personaggi(scene) if scene else {}
     if args.personaggi:
         personaggi.update(leggi_personaggi(args.personaggi))
     if personaggi:
@@ -950,9 +920,227 @@ def main() -> None:
     presenze = {}
     if args.odg:
         noti = sorted({_nome_battuta(r).title() for sc in scene for r in sc.righe if _nome_battuta(r)}) \
-            if args.sceneggiatura else []
+            if scene else []
         presenze = odg.leggi_presenze(args.odg, noti)
         print(f"Ordini del giorno: presenze per {len(presenze)} scene")
+    return personaggi, presenze
+
+
+def volti_della_selezione(args, selezione: list, file_jsonl: Path, rifai: set, cartella_foto: Path,
+                          ritaglio, presenze: dict, personaggi: dict) -> dict:
+    """{numero inquadratura: volti riconosciuti}: nuovi, o quelli già salvati se si rifanno inquadrature."""
+    volti_per_inq = {}
+    if rifai:
+        # Si rifanno inquadrature già descritte: i volti riconosciuti sono già nei risultati.
+        precedenti_volti = {}
+        for riga in file_jsonl.read_text(encoding="utf-8").splitlines():
+            if riga.strip():
+                r = json.loads(riga)
+                precedenti_volti[r["numero"]] = r.get("volti", [])
+        volti_per_inq = {n: v for n, v in precedenti_volti.items() if n in rifai}
+        # I nomi confermati dopo l'analisi (finestra dei volti) sostituiscono quelli di allora.
+        confermati = modulo_volti.nomi_confermati(args.out / "volti" / "nomi.txt")
+        for elenco in volti_per_inq.values():
+            for v in elenco:
+                if v.get("gruppo") in confermati:
+                    v["nome"] = confermati[v["gruppo"]] or f"persona non identificata ({v['gruppo']})"
+    elif not args.senza_volti:
+        progresso.fase("fotogrammi_volti")
+        foto_volti = {}
+        for i, q in enumerate(selezione, 1):
+            foto_volti[q.numero] = estrai_fotogrammi_volti(args.video, q, cartella_foto, ritaglio)
+            progresso.avanzamento("fotogrammi_volti", i, len(selezione))
+        volti_per_inq = modulo_volti.analizza(selezione, foto_volti, args.out / "volti", presenze,
+                                              personaggi, args.modello)
+    return volti_per_inq
+
+
+def descrivi_selezione(args, inquadrature: list, selezione: list, fatte: dict, foto_tutte: dict,
+                       volti_per_inq: dict, personaggi: dict, presenze: dict, correzioni: dict,
+                       tracce: list, riconoscitore, file_jsonl: Path) -> int:
+    """Descrive le inquadrature non ancora fatte, scrivendole subito nel file. Restituisce quante sono nuove."""
+    # Nomi noti dei personaggi, per riconoscerli nelle risposte delle inquadrature vicine.
+    noti = set(personaggi) | {v["nome"] for vv in volti_per_inq.values() for v in vv
+                              if not v["nome"].startswith(("persona non", "comparsa"))}
+
+    def nomi_in(risultato: dict) -> set:
+        testo = " ".join(risultato.get("personaggi", []))
+        return {n for n in noti if re.search(rf"\b{re.escape(n)}\b", testo)}
+
+    def chiave_scena(q: Inquadratura) -> str:
+        return q.scena.intestazione if q.scena else numero_scena_clip(q)
+
+    # Le inquadrature di ogni scena, in ordine: su un film di migliaia di inquadrature evita di
+    # scorrerle tutte a ogni descrizione.
+    per_scena = {}
+    for a in inquadrature:
+        if chiave_scena(a):
+            per_scena.setdefault(chiave_scena(a), []).append(a)
+    per_numero = {a.numero: a for a in inquadrature}
+
+    def precedenti_di(q: Inquadratura) -> list:
+        """Le ultime inquadrature già descritte della stessa scena, per un racconto coerente."""
+        prima = [a for a in per_scena.get(chiave_scena(q), []) if a.numero < q.numero and a.numero in fatte]
+        return [(a.numero, fatte[a.numero]["descrizione"]) for a in prima[-3:]]
+
+    def correzioni_di(q: Inquadratura) -> list:
+        if not chiave_scena(q):
+            return [(q.numero, correzioni[q.numero])] if q.numero in correzioni else []
+        return [(a.numero, correzioni[a.numero]) for a in per_scena.get(chiave_scena(q), [])
+                if a.numero in correzioni]
+
+    def vicini_di(q: Inquadratura) -> list:
+        """Personaggi delle inquadrature vicine (±2) della stessa scena."""
+        nomi = set()
+        for n in range(q.numero - 2, q.numero + 3):
+            altra = per_numero.get(n)
+            if altra is None or altra is q or altra.scena is not q.scena:
+                continue
+            nomi |= {v["nome"] for v in volti_per_inq.get(altra.numero, [])} & noti
+            if altra.numero in fatte:
+                nomi |= nomi_in(fatte[altra.numero])
+        return sorted(nomi)
+
+    inizio_lavoro = time.time()
+    nuove = 0
+    senza_fotogrammi, fallite, di_fila = [], [], 0
+    fatte_qui = sum(1 for x in selezione if x.numero in fatte)
+    progresso.fase("descrizioni")
+    with file_jsonl.open("a", encoding="utf-8") as out:
+        for q in selezione:
+            if q.numero in fatte:
+                continue
+            foto = foto_tutte.get(q.numero)
+            if not foto:
+                print(f"[{q.numero}] nessun fotogramma estratto, salto")
+                senza_fotogrammi.append(q.numero)
+                continue
+            analisi = audio.analizza_inquadratura(tracce, riconoscitore, q.inizio, q.fine) if tracce else {}
+            prompt = costruisci_prompt(q, vicini_di(q), max_scena=3000,
+                                       sonoro=audio.testo_per_prompt(analisi) if analisi else "",
+                                       personaggi=personaggi,
+                                       convocati=presenze.get(q.scena.numero if q.scena else ""),
+                                       volti=modulo_volti.testo_per_prompt(volti_per_inq[q.numero])
+                                       if q.numero in volti_per_inq else "",
+                                       precedenti=precedenti_di(q), correzioni=correzioni_di(q))
+            t0 = time.time()
+            try:
+                desc = chiedi_al_modello(args.modello, prompt, foto)
+            except modulo_modello.ErroreModello as e:
+                # Una risposta mancata non ferma il film: l'inquadratura resta da descrivere e si
+                # rifà alla prossima ripresa. Se però falliscono più inquadrature di fila, il modello
+                # non risponde più (Ollama chiuso o bloccato) ed è inutile continuare.
+                fallite.append(q.numero)
+                di_fila += 1
+                print(f"[{q.numero}] {e}")
+                if di_fila >= FALLIMENTI_DI_FILA:
+                    raise SystemExit(f"Il modello non risponde: {FALLIMENTI_DI_FILA} inquadrature di fila senza "
+                                     f"descrizione. Il lavoro fatto è salvato: rilanciando riprende da qui.")
+                continue
+            di_fila = 0
+            risultato = {
+                "numero": q.numero, "tc_in": q.tc_in, "tc_out": q.tc_out,
+                "durata_s": round(q.fine - q.inizio, 2), "clip": q.clip,
+                "numero_scena": q.scena.numero if q.scena else numero_scena_clip(q),
+                "montaggio": q.montaggio,
+                "scena": q.scena.intestazione if q.scena else "",
+                "dialoghi": [t for _, _, t in q.dialoghi],
+                "copione": q.copione,
+                "volti": volti_per_inq.get(q.numero, []),
+                **desc,
+                "audio": analisi,
+            }
+            if q.numero in correzioni:
+                # La descrizione del montatore comprende già i dialoghi: il riassunto del
+                # modello potrebbe contraddirla.
+                risultato["descrizione"] = correzioni[q.numero]
+                risultato["dialoghi_riassunto"] = ""
+                risultato["corretta"] = True
+            out.write(json.dumps(risultato, ensure_ascii=False) + "\n")
+            out.flush()
+            fatte[q.numero] = risultato
+            nuove += 1
+            fatte_qui += 1
+            progresso.avanzamento("descrizioni", fatte_qui, len(selezione))
+            media = (time.time() - inizio_lavoro) / nuove
+            restanti = len(selezione) - fatte_qui
+            print(f"[{q.numero}/{len(inquadrature)}] {q.tc_in}  {time.time() - t0:.0f}s  "
+                  f"(mancano ~{restanti * media / 60:.0f} min)  {desc['descrizione'][:90]}")
+
+    if fallite:
+        progresso.avviso(f"{len(fallite)} inquadrature senza descrizione perché il modello non ha risposto "
+                         f"correttamente: {', '.join(map(str, fallite[:20]))}{'…' if len(fallite) > 20 else ''}. "
+                         f"Rilancia l'analisi per descriverle.")
+    if senza_fotogrammi:
+        progresso.avviso(f"{len(senza_fotogrammi)} inquadrature non descritte perché non se ne sono potuti estrarre "
+                         f"i fotogrammi: {', '.join(map(str, senza_fotogrammi[:20]))}"
+                         f"{'…' if len(senza_fotogrammi) > 20 else ''}.")
+    return nuove
+
+
+def scrivi_risultati(args, fatte: dict, fps: float, rifai: set, nuove: int, avvio: float) -> None:
+    """File dei risultati, registro del lavoro e report."""
+    file_jsonl = args.out / "inquadrature.jsonl"
+    risultati = [fatte[n] for n in sorted(fatte)]
+    # Le righe rifatte sono state aggiunte in coda: si riscrive il file con una riga per inquadratura.
+    file_jsonl.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in risultati),
+                          encoding="utf-8")
+    scrivi_csv(risultati, args.out / "inquadrature.csv")
+    scrivi_marker_resolve(risultati, args.out / "marker_resolve.edl", fps)
+
+    # Registro del lavoro (per il report): fonte dei tagli, sequenza, tempi di ogni elaborazione.
+    file_lavoro = args.out / "lavoro.json"
+    try:
+        lavoro = json.loads(file_lavoro.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        lavoro = {}
+    if not rifai:
+        lavoro["fonte_tagli"] = (f"AAF {args.edl.name}" if args.edl and args.edl.suffix.lower() == ".aaf"
+                                 else f"EDL {args.edl.name}" if args.edl else "rilevamento automatico dei tagli")
+        if SEQUENZA:
+            lavoro["sequenza"] = SEQUENZA
+    lavoro["modello"] = args.modello
+    lavoro.setdefault("elaborazioni", []).append({
+        "quando": time.strftime("%d/%m/%Y %H:%M"), "tipo": "aggiornamento di inquadrature" if rifai else "analisi",
+        "inquadrature": nuove, "durata_s": round(time.time() - avvio)})
+    lavoro["durata_totale_s"] = sum(x["durata_s"] for x in lavoro["elaborazioni"])
+    file_lavoro.write_text(json.dumps(lavoro, ensure_ascii=False, indent=1), encoding="utf-8")
+    try:
+        import report
+        report.genera(args.out, args.modello)
+    except Exception as e:
+        print(f"Report non generato: {e}")
+        progresso.avviso(f"Il report non è stato creato: {e}")
+    progresso.fase("fine")
+    print(f"\nFatto. File di lavoro in {args.out}/")
+
+
+def main() -> None:
+    args = argomenti()
+    avvio = time.time()
+
+    # Ogni analisi si registra, così l'app la vede anche se è partita da Terminale; all'uscita
+    # (anche se interrotta con Ferma, ⌃C o dalla chiusura dell'app) si toglie e libera il modello.
+    registro = progresso.REGISTRO = coordinamento.Registro(str(args.video), str(args.out))
+    atexit.register(chiusura, registro, args.modello, args.video)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    signal.signal(signal.SIGHUP, lambda *_: sys.exit(129))
+    coordinamento.sorveglia_app()
+    if registro.dati["origine"] == "terminale":
+        coordinamento.notifica(f"Analisi avviata da Terminale: {args.video.name}. La vedi e la puoi fermare dall'app.")
+    rifai = {int(n) for n in re.split(r"[,\s]+", args.rifai) if n} if args.rifai else set()
+
+    fps, durata, tc_inizio_s, inquadrature = carica_inquadrature(args)
+    tracce = []
+    if not args.senza_audio:
+        tracce = prepara_tracce(args, fps, tc_inizio_s)
+        for t in tracce:
+            print(f"Audio {t.tipo}: {t.percorso.name} (spostamento {t.spostamento:+.2f} s)")
+
+    args.out.mkdir(parents=True, exist_ok=True)
+    scene = leggi_sceneggiatura(args.sceneggiatura) if args.sceneggiatura else []  # letta una volta sola
+    riconoscitore = prepara_dialoghi(args, tracce, inquadrature, scene, fps, tc_inizio_s)
+    personaggi, presenze = prepara_copione(args, inquadrature, scene)
     ritaglio = None if args.senza_ritaglio else rileva_bande_nere(args.video, durata)
     if ritaglio:
         print(f"Bande nere rilevate: ritaglio {ritaglio}")
@@ -989,156 +1177,16 @@ def main() -> None:
     for i, q in enumerate(selezione, 1):
         foto_tutte[q.numero] = estrai_fotogrammi(args.video, q, cartella_foto, args.larghezza, ritaglio)
         progresso.avanzamento("fotogrammi", i, len(selezione))
-    volti_per_inq = {}
-    if rifai:
-        # Si rifanno inquadrature già descritte: i volti riconosciuti sono già nei risultati.
-        precedenti_volti = {}
-        for riga in file_jsonl.read_text(encoding="utf-8").splitlines():
-            if riga.strip():
-                r = json.loads(riga)
-                precedenti_volti[r["numero"]] = r.get("volti", [])
-        volti_per_inq = {n: v for n, v in precedenti_volti.items() if n in rifai}
-        # I nomi confermati dopo l'analisi (finestra dei volti) sostituiscono quelli di allora.
-        confermati = modulo_volti.nomi_confermati(args.out / "volti" / "nomi.txt")
-        for elenco in volti_per_inq.values():
-            for v in elenco:
-                if v.get("gruppo") in confermati:
-                    v["nome"] = confermati[v["gruppo"]] or f"persona non identificata ({v['gruppo']})"
-    elif not args.senza_volti:
-        progresso.fase("fotogrammi_volti")
-        foto_volti = {}
-        for i, q in enumerate(selezione, 1):
-            foto_volti[q.numero] = estrai_fotogrammi_volti(args.video, q, cartella_foto, ritaglio)
-            progresso.avanzamento("fotogrammi_volti", i, len(selezione))
-        volti_per_inq = modulo_volti.analizza(selezione, foto_volti, args.out / "volti", presenze,
-                                              personaggi, args.modello)
+    volti_per_inq = volti_della_selezione(args, selezione, file_jsonl, rifai, cartella_foto, ritaglio,
+                                          presenze, personaggi)
     if args.solo_volti:
         print("Fermo qui (--solo-volti). Correggi volti/nomi.txt e rilancia senza --solo-volti.")
         progresso.fase("fine")
         return
 
-    # Nomi noti dei personaggi, per riconoscerli nelle risposte delle inquadrature vicine.
-    noti = set(personaggi) | {v["nome"] for vv in volti_per_inq.values() for v in vv
-                              if not v["nome"].startswith(("persona non", "comparsa"))}
-
-    def nomi_in(risultato: dict) -> set:
-        testo = " ".join(risultato.get("personaggi", []))
-        return {n for n in noti if re.search(rf"\b{re.escape(n)}\b", testo)}
-
-    def chiave_scena(q: Inquadratura) -> str:
-        return q.scena.intestazione if q.scena else numero_scena_clip(q)
-
-    def precedenti_di(q: Inquadratura) -> list:
-        """Le ultime inquadrature già descritte della stessa scena, per un racconto coerente."""
-        prima = [a for a in inquadrature if a.numero < q.numero and a.numero in fatte
-                 and chiave_scena(a) and chiave_scena(a) == chiave_scena(q)]
-        return [(a.numero, fatte[a.numero]["descrizione"]) for a in prima[-3:]]
-
-    def correzioni_di(q: Inquadratura) -> list:
-        if not chiave_scena(q):
-            return [(q.numero, correzioni[q.numero])] if q.numero in correzioni else []
-        return [(a.numero, correzioni[a.numero]) for a in inquadrature
-                if a.numero in correzioni and chiave_scena(a) == chiave_scena(q)]
-
-    def vicini_di(q: Inquadratura) -> list:
-        """Personaggi delle inquadrature vicine (±2) della stessa scena."""
-        nomi = set()
-        for altra in inquadrature:
-            if altra is q or abs(altra.numero - q.numero) > 2 or altra.scena is not q.scena:
-                continue
-            nomi |= {v["nome"] for v in volti_per_inq.get(altra.numero, [])} & noti
-            if altra.numero in fatte:
-                nomi |= nomi_in(fatte[altra.numero])
-        return sorted(nomi)
-
-    inizio_lavoro = time.time()
-    nuove = 0
-    senza_fotogrammi = []
-    progresso.fase("descrizioni")
-    with file_jsonl.open("a", encoding="utf-8") as out:
-        for q in selezione:
-            if q.numero in fatte:
-                continue
-            foto = foto_tutte.get(q.numero)
-            if not foto:
-                print(f"[{q.numero}] nessun fotogramma estratto, salto")
-                senza_fotogrammi.append(q.numero)
-                continue
-            analisi = audio.analizza_inquadratura(tracce, riconoscitore, q.inizio, q.fine) if tracce else {}
-            prompt = costruisci_prompt(q, vicini_di(q), max_scena=3000,
-                                       sonoro=audio.testo_per_prompt(analisi) if analisi else "",
-                                       personaggi=personaggi,
-                                       convocati=presenze.get(q.scena.numero if q.scena else ""),
-                                       volti=modulo_volti.testo_per_prompt(volti_per_inq[q.numero])
-                                       if q.numero in volti_per_inq else "",
-                                       precedenti=precedenti_di(q), correzioni=correzioni_di(q))
-            t0 = time.time()
-            desc = chiedi_al_modello(args.modello, prompt, foto)
-            risultato = {
-                "numero": q.numero, "tc_in": q.tc_in, "tc_out": q.tc_out,
-                "durata_s": round(q.fine - q.inizio, 2), "clip": q.clip,
-                "numero_scena": q.scena.numero if q.scena else numero_scena_clip(q),
-                "montaggio": q.montaggio,
-                "scena": q.scena.intestazione if q.scena else "",
-                "dialoghi": [t for _, _, t in q.dialoghi],
-                "copione": q.copione,
-                "volti": volti_per_inq.get(q.numero, []),
-                **desc,
-                "audio": analisi,
-            }
-            if q.numero in correzioni:
-                # La descrizione del montatore comprende già i dialoghi: il riassunto del
-                # modello potrebbe contraddirla.
-                risultato["descrizione"] = correzioni[q.numero]
-                risultato["dialoghi_riassunto"] = ""
-                risultato["corretta"] = True
-            out.write(json.dumps(risultato, ensure_ascii=False) + "\n")
-            out.flush()
-            fatte[q.numero] = risultato
-            nuove += 1
-            progresso.avanzamento("descrizioni", sum(1 for x in selezione if x.numero in fatte),
-                                  len(selezione))
-            media = (time.time() - inizio_lavoro) / nuove
-            restanti = sum(1 for x in selezione if x.numero not in fatte)
-            print(f"[{q.numero}/{len(inquadrature)}] {q.tc_in}  {time.time() - t0:.0f}s  "
-                  f"(mancano ~{restanti * media / 60:.0f} min)  {desc['descrizione'][:90]}")
-
-    if senza_fotogrammi:
-        progresso.avviso(f"{len(senza_fotogrammi)} inquadrature non descritte perché non se ne sono potuti estrarre "
-                         f"i fotogrammi: {', '.join(map(str, senza_fotogrammi[:20]))}"
-                         f"{'…' if len(senza_fotogrammi) > 20 else ''}.")
-    risultati = [fatte[n] for n in sorted(fatte)]
-    # Le righe rifatte sono state aggiunte in coda: si riscrive il file con una riga per inquadratura.
-    file_jsonl.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in risultati),
-                          encoding="utf-8")
-    scrivi_csv(risultati, args.out / "inquadrature.csv")
-    scrivi_marker_resolve(risultati, args.out / "marker_resolve.edl", fps)
-
-    # Registro del lavoro (per il report): fonte dei tagli, sequenza, tempi di ogni elaborazione.
-    file_lavoro = args.out / "lavoro.json"
-    try:
-        lavoro = json.loads(file_lavoro.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        lavoro = {}
-    if not rifai:
-        lavoro["fonte_tagli"] = (f"AAF {args.edl.name}" if args.edl and args.edl.suffix.lower() == ".aaf"
-                                 else f"EDL {args.edl.name}" if args.edl else "rilevamento automatico dei tagli")
-        if SEQUENZA:
-            lavoro["sequenza"] = SEQUENZA
-    lavoro["modello"] = args.modello
-    lavoro.setdefault("elaborazioni", []).append({
-        "quando": time.strftime("%d/%m/%Y %H:%M"), "tipo": "aggiornamento di inquadrature" if rifai else "analisi",
-        "inquadrature": nuove, "durata_s": round(time.time() - avvio)})
-    lavoro["durata_totale_s"] = sum(x["durata_s"] for x in lavoro["elaborazioni"])
-    file_lavoro.write_text(json.dumps(lavoro, ensure_ascii=False, indent=1), encoding="utf-8")
-    try:
-        import report
-        report.genera(args.out, args.modello)
-    except Exception as e:
-        print(f"Report non generato: {e}")
-        progresso.avviso(f"Il report non è stato creato: {e}")
-    progresso.fase("fine")
-    print(f"\nFatto. File di lavoro in {args.out}/")
+    nuove = descrivi_selezione(args, inquadrature, selezione, fatte, foto_tutte, volti_per_inq, personaggi,
+                               presenze, correzioni, tracce, riconoscitore, file_jsonl)
+    scrivi_risultati(args, fatte, fps, rifai, nuove, avvio)
 
 
 if __name__ == "__main__":

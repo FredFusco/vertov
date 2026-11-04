@@ -17,13 +17,12 @@ import json
 import re
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
-import coordinamento
+import modello as modulo_modello
 import progresso
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
+SCHEMA_SINOSSI = {"type": "object", "properties": {"sinossi": {"type": "string"}}, "required": ["sinossi"]}
 NOMI_RUOLI = {
     "video": "Video del film", "edl": "Montaggio (EDL o AAF)", "audio_dialoghi": "Stem dialoghi",
     "audio_sfx": "Stem effetti", "audio_musica": "Stem musica", "audio_mix": "Mix completo",
@@ -81,22 +80,13 @@ def sinossi_scene(scene: list, modello: str, cache_file: Path) -> dict:
     if da_fare:
         progresso.fase("report")
     for i, (chiave, testo, impronta) in enumerate(da_fare, 1):
-        corpo = {
-            "model": modello, "stream": False, "think": False, "keep_alive": coordinamento.TENUTA,
-            "format": {"type": "object", "properties": {"sinossi": {"type": "string"}}, "required": ["sinossi"]},
-            "options": {"temperature": 0.2, "num_ctx": coordinamento.CONTESTO},
-            "messages": [{"role": "user", "content":
-                          "Ecco le descrizioni, in ordine, delle inquadrature di una scena di un film. "
-                          "Scrivi in italiano una sinossi della scena in due o tre frasi: cosa succede e di cosa "
-                          "parlano i personaggi, al presente, senza elencare le inquadrature e senza inventare "
-                          "nulla che non sia nelle descrizioni.\n\n" + testo[:12000]}],
-        }
+        prompt = ("Ecco le descrizioni, in ordine, delle inquadrature di una scena di un film. "
+                  "Scrivi in italiano una sinossi della scena in due o tre frasi: cosa succede e di cosa "
+                  "parlano i personaggi, al presente, senza elencare le inquadrature e senza inventare "
+                  "nulla che non sia nelle descrizioni.\n\n" + testo[:12000])
         try:
-            req = urllib.request.Request(OLLAMA_URL, data=json.dumps(corpo).encode(),
-                                         headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=300) as r:
-                sinossi = json.loads(json.load(r)["message"]["content"])["sinossi"].strip()
-        except Exception as e:
+            sinossi = modulo_modello.chiedi(prompt, schema=SCHEMA_SINOSSI, modello=modello, timeout=300)["sinossi"]
+        except modulo_modello.ErroreModello as e:
             print(f"Sinossi della scena {chiave} non riuscita: {e}")
             progresso.avviso(f"Sinossi della scena {chiave} non scritta: il modello non ha risposto.")
             sinossi = ""
@@ -119,7 +109,7 @@ def genera(out: Path, modello: str = None) -> Path:
     lavoro = _leggi_json(out / "lavoro.json", {})
     gruppi = _leggi_json(out / "volti" / "gruppi_info.json", [])
     correzioni = _leggi_json(out / "correzioni.json", {})
-    modello = modello or lavoro.get("modello") or "qwen3-vl:30b-a3b-instruct"
+    modello = modello or modulo_modello.MODELLO
 
     # Scene, nell'ordine del montaggio (una scena può tornare: si tiene ogni blocco contiguo).
     scene = []

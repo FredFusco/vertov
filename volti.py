@@ -16,7 +16,7 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
-import coordinamento
+import modello as modulo_modello
 import progresso
 
 CARTELLA_MODELLI = Path(os.path.expanduser("~/.cache/descrittore/modelli"))
@@ -31,6 +31,7 @@ SOGLIA_STESSA_PERSONA = 0.45   # somiglianza minima (coseno) per riconoscere un 
 DISTANZA_GRUPPI = 0.58         # raggruppamento gerarchico: distanza media massima nel gruppo
 FRONTALITA_MINIMA = 0.28       # distanza tra gli occhi / larghezza del volto: sotto è di profilo
 MINIMO_VOLTI_GRUPPO = 3
+ALTEZZA_RITAGLIO = 240     # pixel: i ritagli dei volti si tengono come piccoli JPEG (mosaici e pagina)
 
 
 def _modelli():
@@ -73,9 +74,52 @@ class Riconoscitore:
             imp = imp / (np.linalg.norm(imp) + 1e-9)
             x0, y0 = max(int(x - bw * 0.25), 0), max(int(y - bh * 0.25), 0)
             ritaglio = img[y0:int(y + bh * 1.25), x0:int(x + bw * 1.25)]
+            if ritaglio.shape[0] > ALTEZZA_RITAGLIO:
+                scala = ALTEZZA_RITAGLIO / ritaglio.shape[0]
+                ritaglio = self.cv2.resize(ritaglio, (max(1, int(ritaglio.shape[1] * scala)), ALTEZZA_RITAGLIO))
+            # In memoria il ritaglio sta compresso (circa 10 KB invece di 100-500 KB): su un film
+            # intero i volti sono decine di migliaia e servono solo i migliori di ogni persona.
+            ok, jpg = self.cv2.imencode(".jpg", ritaglio, [self.cv2.IMWRITE_JPEG_QUALITY, 88])
             risultato.append({"impronta": imp, "x": (x + bw / 2) / w, "altezza": bh / h,
-                              "ritaglio": ritaglio})
+                              "ritaglio": jpg.tobytes() if ok else b""})
         return risultato
+
+
+def _apri(jpg: bytes):
+    import cv2
+    import numpy as np
+    return cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR) if jpg else None
+
+
+def _rilevamenti(r: "Riconoscitore", q, foto: list, cartella: Path) -> list:
+    """I volti di un'inquadratura, letti dalla copia salvata se i fotogrammi sono gli stessi.
+
+    Così una ripresa non rifà il riconoscimento su tutte le inquadrature già viste."""
+    import numpy as np
+    chiave = "|".join(f"{Path(p).name}:{Path(p).stat().st_size}" for p in foto)
+    file = cartella / f"{q.numero:05d}.npz"
+    if file.exists():
+        try:
+            d = np.load(file)
+            if str(d["chiave"]) == chiave:
+                pezzi = np.split(d["jpg"], np.cumsum(d["lunghezze"])[:-1]) if len(d["lunghezze"]) else []
+                return [{"impronta": d["impronte"][i], "x": float(d["x"][i]), "altezza": float(d["altezza"][i]),
+                         "fotogramma": int(d["fotogramma"][i]), "ritaglio": pezzi[i].tobytes()}
+                        for i in range(len(d["x"]))]
+        except (OSError, ValueError, KeyError):
+            pass  # copia illeggibile: si rifà
+    volti = []
+    for i, p in enumerate(foto):
+        for v in r.volti(p):
+            v["fotogramma"] = i
+            volti.append(v)
+    cartella.mkdir(parents=True, exist_ok=True)
+    np.savez(file, chiave=chiave, impronte=np.array([v["impronta"] for v in volti], dtype=np.float32).reshape(-1, 128),
+             x=np.array([v["x"] for v in volti]), altezza=np.array([v["altezza"] for v in volti]),
+             fotogramma=np.array([v["fotogramma"] for v in volti], dtype=np.int32),
+             jpg=np.frombuffer(b"".join(v["ritaglio"] for v in volti), dtype=np.uint8),
+             lunghezze=np.array([len(v["ritaglio"]) for v in volti], dtype=np.int64))
+    return volti
 
 
 def _raggruppa(volti: list, centri_noti: dict) -> None:
@@ -131,8 +175,8 @@ def _candidati(g: str, per_inquadratura: dict, inquadrature: list, presenze: dic
 def _mosaico(ritagli: list, altezza: int = 200):
     import cv2
     import numpy as np
-    foto = [cv2.resize(r, (max(1, int(r.shape[1] * altezza / r.shape[0])), altezza))
-            for r in ritagli[:6] if r.size]
+    immagini = [i for i in (_apri(r) for r in ritagli[:6]) if i is not None and i.size]
+    foto = [cv2.resize(r, (max(1, int(r.shape[1] * altezza / r.shape[0])), altezza)) for r in immagini]
     if not foto:
         return None
     ok, jpg = cv2.imencode(".jpg", np.hstack(foto), [cv2.IMWRITE_JPEG_QUALITY, 90])
@@ -182,18 +226,10 @@ def _nomi_dal_modello(gruppi: dict, candidati: dict, schede: dict, modello: str,
             "occhiali e lineamenti con le descrizioni e con i volti di riferimento. Rispondi con "
             "il nome di un personaggio solo se corrisponde chiaramente; se è un'altra persona "
             "rispondi \"comparsa\", se non puoi deciderlo \"sconosciuto\". Rispondi in italiano.")
-        corpo = {"model": modello, "stream": False, "think": False, "format": schema,
-                 "keep_alive": coordinamento.TENUTA,
-                 "options": {"temperature": 0.0, "num_ctx": coordinamento.CONTESTO},
-                 "messages": [{"role": "user", "content": prompt,
-                               "images": [base64.b64encode(i).decode() for i in immagini]}]}
         try:
-            req = urllib.request.Request("http://localhost:11434/api/chat",
-                                         data=json.dumps(corpo).encode(),
-                                         headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=300) as r:
-                risposta = json.loads(json.load(r)["message"]["content"])
-        except Exception as e:  # il riconoscimento dei volti non deve fermare il lavoro
+            risposta = modulo_modello.chiedi(prompt, [base64.b64encode(i).decode() for i in immagini], schema,
+                                             modello, temperatura=0.0, timeout=300)
+        except modulo_modello.ErroreModello as e:  # il riconoscimento dei volti non deve fermare il lavoro
             print(f"  {g}: il modello non ha risposto ({e})")
             progresso.avviso(f"Il volto {g} è rimasto senza nome: il modello non ha risposto.")
             continue
@@ -316,10 +352,9 @@ def analizza(inquadrature: list, foto: dict, cartella: Path, presenze: dict,
     volti = []
     progresso.fase("volti")
     for n, q in enumerate(inquadrature, 1):
-        for i, p in enumerate(foto.get(q.numero, [])):
-            for v in r.volti(p):
-                v["inquadratura"], v["fotogramma"] = q.numero, i
-                volti.append(v)
+        for v in _rilevamenti(r, q, foto.get(q.numero, []), cartella / "rilevamenti"):
+            v["inquadratura"] = q.numero
+            volti.append(v)
         progresso.avanzamento("volti", n, len(inquadrature))
     _raggruppa(volti, {g: d["centro"] for g, d in salvati.items()})
 
@@ -355,7 +390,10 @@ def analizza(inquadrature: list, foto: dict, cartella: Path, presenze: dict,
                 nomi_utente[g] = nome
     visivi = {}
     if modello:
-        senza_nome = [g for g in validi if not nomi_utente.get(g)]
+        # Si chiede al modello solo dei gruppi su cui non l'ha ancora fatto (con o senza risposta):
+        # alle riprese le proposte già fatte restano, senza rifare le stesse domande.
+        senza_nome = [g for g in validi if not nomi_utente.get(g) and not proposte_precedenti.get(g)
+                      and not salvati.get(g, {}).get("chiesto")]
         if senza_nome:
             print(f"Confronto {len(senza_nome)} gruppi di volti con le schede dei personaggi...")
         # Dal gruppo più numeroso: le sue impronte sono le più affidabili e diventa riferimento.
@@ -377,6 +415,9 @@ def analizza(inquadrature: list, foto: dict, cartella: Path, presenze: dict,
         candidati = {g: _candidati(g, per_inquadratura, inquadrature, presenze, schede or {})
                      for g in senza_nome}
         visivi = _nomi_dal_modello(ritagli, candidati, schede or {}, modello, riferimenti)
+    for g, nome in proposte_precedenti.items():
+        if g in validi and g not in visivi:
+            visivi[g] = (nome, "alta")
     proposte = _proponi_nomi(per_inquadratura, inquadrature, presenze, centri, nomi_utente, visivi)
     nomi = {g: nomi_utente[g] if g in nomi_utente else proposte.get(g, "") for g in validi}
     # Le proposte di gruppi non visti in questa esecuzione restano nel file.
@@ -385,9 +426,12 @@ def analizza(inquadrature: list, foto: dict, cartella: Path, presenze: dict,
             proposte.setdefault(g, nome)
 
     # Salvataggio dei gruppi, per ritrovarli identici alla prossima esecuzione.
+    chiesti = set(visivi) | {g for g in validi if salvati.get(g, {}).get("chiesto")}
+    if modello:
+        chiesti |= set(senza_nome)
     for g in validi:
         precedente = salvati.get(g, {}).get("centro")
-        salvati[g] = {"centro": precedente or centri[g].tolist()}
+        salvati[g] = {"centro": precedente or centri[g].tolist(), **({"chiesto": True} if g in chiesti else {})}
     file_gruppi.write_text(json.dumps(salvati))
 
     _scrivi_nomi(file_nomi, validi, {**proposte, **nomi}, nomi_utente, quanti)
@@ -444,7 +488,7 @@ def _scrivi_pagina(cartella: Path, volti, validi, nomi, nomi_utente, per_inquadr
         immagini = []
         for i, v in enumerate(esempi):
             nome_file = f"img/{g}_{i}.jpg"
-            cv2.imwrite(str(cartella / nome_file), v["ritaglio"], [cv2.IMWRITE_JPEG_QUALITY, 85])
+            (cartella / nome_file).write_bytes(v["ritaglio"])
             immagini.append(f'<figure><img src="{nome_file}" alt=""><figcaption>inq. '
                             f'{v["inquadratura"]}</figcaption></figure>')
         nome = nomi.get(g)

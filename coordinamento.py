@@ -5,8 +5,8 @@
   l'app vede anche le analisi partite fuori da lei, e nessuna resta accesa per ore di nascosto.
 - Sorveglianza: un'analisi lanciata dall'app si spegne da sola se l'app non c'è più (chiusa,
   forzata, andata in crash).
-- Turni sul modello: Vertov, Murnau e Ozu usano lo stesso Qwen3-VL con contesti diversi, e
-  Ollama lo ricarica (20 GB) ogni volta che il contesto cambia. Vertov ha la precedenza:
+- Turni sul modello: Vertov, Murnau e Ozu usano gli stessi modelli (Gemma 4, Qwen3-VL) con contesti diversi, e
+  Ollama li ricarica (16-20 GB) ogni volta che il contesto cambia. Vertov ha la precedenza:
   Murnau e Ozu riconoscono un'analisi di Vertov dal programma descrivi.py e aspettano.
   Per questo ogni richiesta di Vertov usa lo stesso contesto (CONTESTO).
 - Memoria: a fine analisi Vertov toglie il modello dalla memoria, se è la copia caricata da

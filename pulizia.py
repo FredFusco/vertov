@@ -6,6 +6,7 @@ delle analisi né le sessioni: solo cose che Vertov ha creato o scaricato.
 """
 
 import json
+import re
 import shutil
 import tempfile
 import urllib.request
@@ -59,10 +60,34 @@ def _modelli_hf_non_usati() -> list:
     return esito
 
 
+# Le app sorelle (Murnau, Ozu...) stanno accanto alla cartella di Vertov.
+FAMIGLIA = Path(__file__).resolve().parent.parent
+
+
+def modelli_protetti(modello: str) -> dict:
+    """{modello di Ollama: app che lo usano}. Libera spazio non li propone mai.
+
+    Quelli delle altre app si leggono dal loro codice, da ogni costante che nomina un modello
+    (MODELLO = "gemma4:26b", REVISORE = "qwen3.8:27b-dflash2-nvfp4"...): così la scelta nuova
+    di un'app sorella è protetta senza dover cambiare Vertov."""
+    protetti = {modello: {"Vertov"}}
+    for f in FAMIGLIA.glob("*/*.py"):
+        try:
+            testo = f.read_text(errors="ignore")
+        except OSError:
+            continue
+        app = "Vertov" if f.parent == Path(__file__).resolve().parent else f.parent.name.capitalize()
+        for nome in re.findall(r'^\s*[A-Z][A-Z0-9_]* *= *"([\w.:/-]+:[\w.:-]+)"', testo, re.M):
+            if "//" not in nome:  # indirizzi come http://localhost:11434, non modelli
+                protetti.setdefault(nome, set()).add(app)
+    return protetti
+
+
 def _modelli_ollama_non_usati(modello: str) -> list:
+    protetti = modelli_protetti(modello)
     try:
         with urllib.request.urlopen(f"{OLLAMA}/api/tags", timeout=3) as r:
-            return [(m["name"], m.get("size", 0)) for m in json.load(r).get("models", []) if m["name"] != modello]
+            return [(m["name"], m.get("size", 0)) for m in json.load(r).get("models", []) if m["name"] not in protetti]
     except Exception:
         return []
 
@@ -91,7 +116,7 @@ def voci(modello: str) -> list:
               "byte": sum(b for _, _, b, _ in hf), "consigliata": True})
     ollama = _modelli_ollama_non_usati(modello)
     v.append({"chiave": "modelli_ollama", "nome": "Altri modelli in Ollama",
-              "spiega": "Modelli di Ollama diversi da quello che usa Vertov (" + modello + "): " +
+              "spiega": "Modelli di Ollama che non usano né Vertov né le app sorelle (Murnau, Ozu): " +
                         (", ".join(n for n, _ in ollama) or "nessuno") +
                         ". Lasciali se usi Ollama anche per altro.",
               "byte": sum(b for _, b in ollama), "consigliata": False})

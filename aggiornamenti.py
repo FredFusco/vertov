@@ -153,22 +153,35 @@ def controlla_librerie() -> list:
             for p in json.loads(r.stdout or "[]") if p["name"] != "pip"]
 
 
-def controlla_modello_visione(modello: str) -> list:
-    """Confronta l'impronta del modello scaricato con quella del registro di Ollama."""
-    with urllib.request.urlopen(f"{OLLAMA}/api/tags", timeout=3) as r:
-        locali = {m["name"]: m.get("digest", "") for m in json.load(r).get("models", [])}
-    if modello not in locali:
-        return []
+def _impronta_remota(modello: str) -> str:
     nome, _, etichetta = modello.partition(":")
     percorso = nome if "/" in nome else f"library/{nome}"
     _, corpo = _scarica_json(f"{REGISTRO}/{percorso}/manifests/{etichetta or 'latest'}",
                              {"Accept": "application/vnd.docker.distribution.manifest.v2+json"})
-    remota = hashlib.sha256(corpo).hexdigest()
-    if remota == locali[modello]:
+    return hashlib.sha256(corpo).hexdigest()
+
+
+def controlla_modello_visione(modello: str) -> list:
+    """Confronta il modello scaricato con quello del registro di Ollama.
+
+    I modelli del motore MLX (come gemma4:26b) vengono convertiti dopo lo scaricamento, quindi la
+    loro impronta sul Mac non coincide mai con quella del registro: si confronta allora l'impronta
+    del registro con quella che aveva quando il modello è stato scaricato (ricordata in
+    aggiornamenti.json). Se non la si conosce, la si prende come punto di partenza."""
+    with urllib.request.urlopen(f"{OLLAMA}/api/tags", timeout=3) as r:
+        locali = {m["name"]: m.get("digest", "") for m in json.load(r).get("models", [])}
+    if modello not in locali:
+        return []
+    remota = _impronta_remota(modello)
+    scaricate = leggi_stato().get("modelli_scaricati", {})
+    if remota in (scaricate.get(modello), locali[modello]):
+        return []
+    if modello not in scaricate:
+        scrivi_stato(modelli_scaricati={**scaricate, modello: remota})
         return []
     return [{"chiave": "ollama:" + modello, "gruppo": "modello", "nome": modello,
-             "descrizione": "il modello di visione che descrive le immagini (download di circa 20 GB)",
-             "attuale": locali[modello][:12], "nuova": remota[:12], "impronta": remota}]
+             "descrizione": "il modello di visione che descrive le immagini (download di circa 16 GB)",
+             "attuale": scaricate[modello][:12], "nuova": remota[:12], "impronta": remota}]
 
 
 def controlla_modelli_hf() -> list:
@@ -334,6 +347,8 @@ def _installa_modello_visione(modello: str) -> None:
                 raise RuntimeError(f"download non riuscito: {stato['error']}")
             if stato.get("total") and stato.get("completed") is not None:
                 _fase(INSTALLAZIONE["fase"], stato["completed"] // 2**20, stato["total"] // 2**20)
+    scaricate = leggi_stato().get("modelli_scaricati", {})
+    scrivi_stato(modelli_scaricati={**scaricate, modello: _impronta_remota(modello)})
 
 
 def _installa_modello_hf(repo: str) -> None:

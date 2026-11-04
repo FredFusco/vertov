@@ -23,6 +23,7 @@ from collections import deque
 
 import aggiornamenti
 import coordinamento
+import modello as modulo_modello
 import pulizia
 import riconosci
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,7 +36,7 @@ FILE_ULTIMO = Path.home() / ".cache" / "descrittore" / "ultimo_progetto.json"  #
 DATI = Path.home() / "Library" / "Application Support" / "Vertov"
 SESSIONI = DATI / "sessioni"
 FILE_CORRENTE = DATI / "sessione_corrente.json"
-MODELLO = "qwen3-vl:30b-a3b-instruct"
+MODELLO = modulo_modello.MODELLO  # il modello di visione: si sceglie in modello.py
 # I file con cui Vertov lavora (descrizioni grezze, volti, sinossi, trascrizione...) stanno dentro la
 # cartella di Vertov, una cartella per sessione (mai pubblicata: vedi .gitignore). Nella cartella di
 # destinazione scelta dall'utente finisce solo ciò che esporta.
@@ -380,7 +381,7 @@ def comando(p: dict, solo_volti: bool = False, rifai: list = ()) -> list:
 # e vengono sostituiti dai tempi misurati su questo Mac alla fine di ogni analisi.
 FILE_TEMPI = DATI / "tempi.json"
 TEMPI_TIPICI = {"fotogrammi": 0.4, "fotogrammi_volti": 0.6, "volti": 1.2, "confronto_volti": 0.2,
-                "descrizioni": 11.0, "report": 0.6}
+                "descrizioni": 4.0, "report": 0.6}
 # Le fasi che restano, nell'ordine in cui arrivano, per ogni tipo di lavoro.
 SEQUENZE = {"descrizioni": ["fotogrammi", "fotogrammi_volti", "volti", "confronto_volti", "descrizioni", "report"],
             "correzione": ["fotogrammi", "descrizioni", "report"],
@@ -609,6 +610,19 @@ def avvisa_fine(esito: dict) -> None:
 # Controlli e utilità
 # --------------------------------------------------------------------------
 
+_RICORDATI = {}  # chiave -> (quando, valore): risposte riusate per qualche secondo
+
+
+def ricordato(chiave: str, secondi: float, calcola):
+    """Il valore calcolato da poco, se c'è: l'interfaccia chiede lo stato ogni secondo e mezzo,
+    ma non serve rifare ogni volta due comandi ps e una domanda a Ollama."""
+    quando, valore = _RICORDATI.get(chiave, (0.0, None))
+    if time.time() - quando > secondi:
+        valore = calcola()
+        _RICORDATI[chiave] = (time.time(), valore)
+    return valore
+
+
 def prerequisiti() -> dict:
     stato = {"ollama": False, "modello": False}
     try:
@@ -727,23 +741,46 @@ def esporta(p: dict, formati: list) -> list:
     return creati
 
 
-def leggi_risultati(out: Path) -> list:
+def _riga_risultato(r: dict) -> dict:
+    riga = {k: r.get(k) for k in (
+        "numero", "numero_scena", "tc_in", "tc_out", "durata_s", "scena", "piano",
+        "movimento_macchina", "personaggi", "azione", "sonoro", "dialoghi_riassunto",
+        "descrizione", "dialoghi", "corretta", "montaggio", "clip")}
+    if not riga["numero_scena"]:
+        # Risultati di versioni precedenti: scena dal nome clip (scena/inquadratura/ciak).
+        riga["numero_scena"] = scena_da_clip(r.get("clip"))
+    return riga
+
+
+def leggi_risultati_da(out: Path, da: int = 0) -> dict:
+    """Le inquadrature descritte, dalla posizione da (in byte) del file in poi.
+
+    Durante un'analisi il file cresce solo in coda: l'interfaccia chiede soltanto le righe nuove
+    invece di rileggere e ridisegnare tutto il film a ogni inquadratura. Con da=0, o se il file è
+    stato riscritto più corto, si rilegge tutto (completo=True)."""
     risultati = {}
     try:
-        for riga in (out / "inquadrature.jsonl").read_text(encoding="utf-8").splitlines():
-            if riga.strip():
-                r = json.loads(riga)
-                riga_r = {k: r.get(k) for k in (
-                    "numero", "numero_scena", "tc_in", "tc_out", "durata_s", "scena", "piano",
-                    "movimento_macchina", "personaggi", "azione", "sonoro", "dialoghi_riassunto",
-                    "descrizione", "dialoghi", "corretta", "montaggio", "clip")}
-                if not riga_r["numero_scena"]:
-                    # Risultati di versioni precedenti: scena dal nome clip (scena/inquadratura/ciak).
-                    riga_r["numero_scena"] = scena_da_clip(r.get("clip"))
-                risultati[riga_r["numero"]] = riga_r  # una riga rifatta sostituisce la precedente
+        with (out / "inquadrature.jsonl").open("rb") as f:
+            dimensione = f.seek(0, 2)
+            completo = da <= 0 or da > dimensione
+            f.seek(0 if completo else da)
+            dati = f.read()
     except OSError:
-        pass
-    return [risultati[n] for n in sorted(risultati)]
+        return {"righe": [], "fine": 0, "completo": True}
+    fine = dati.rfind(b"\n") + 1  # solo righe complete: l'ultima potrebbe essere a metà scrittura
+    for riga in dati[:fine].decode("utf-8", errors="replace").splitlines():
+        if riga.strip():
+            try:
+                r = _riga_risultato(json.loads(riga))
+            except ValueError:
+                continue
+            risultati[r["numero"]] = r  # una riga rifatta sostituisce la precedente
+    return {"righe": [risultati[n] for n in sorted(risultati)], "completo": completo,
+            "fine": (0 if completo else da) + fine}
+
+
+def leggi_risultati(out: Path) -> list:
+    return leggi_risultati_da(out)["righe"]
 
 
 def inquadrature_della_scena(out: Path, numero: int) -> list:
@@ -815,14 +852,14 @@ class Gestore(BaseHTTPRequestHandler):
                         "da": time.time() - a["avviata"] if a.get("avviata") else None,
                         "fase": a.get("fase", ""), "fatti": a.get("fatti", 0), "totale": a.get("totale", 0),
                         "out": a.get("out", "")}
-                       for a in coordinamento.analisi_in_corso() if a["pid"] != nostra]
+                       for a in ricordato("esterne", 5, coordinamento.analisi_in_corso) if a["pid"] != nostra]
             self._json({"progetto": progetto, "lavoro": LAVORO.stato(), "mancanti": mancanti, "esterne": esterne,
                         "volti_pronti": (out / "volti" / "gruppi_info.json").exists(),
                         "volti_proposti": sum(1 for g in leggi_gruppi(out) if g.get("nome") and not g.get("confermato")
                                               and g["nome"] != "comparsa"),
                         "report_pronto": (out / "report_vertov.html").exists(),
                         "esportabili": {k: (out / v[0]).exists() for k, v in ESPORTAZIONI.items()},
-                        "prerequisiti": prerequisiti(), "personaggi": personaggi})
+                        "prerequisiti": ricordato("prerequisiti", 10, prerequisiti), "personaggi": personaggi})
         elif url.path == "/api/sessioni":
             self._json({"corrente": progetto["id"], "sessioni": elenco_sessioni()})
         elif url.path == "/api/aggiornamenti":
@@ -833,7 +870,8 @@ class Gestore(BaseHTTPRequestHandler):
         elif url.path == "/api/volti":
             self._json(leggi_gruppi(_lavoro(progetto)))
         elif url.path == "/api/risultati":
-            self._json(leggi_risultati(_lavoro(progetto)))
+            da = int(parse_qs(url.query).get("da", ["0"])[0] or 0)
+            self._json(leggi_risultati_da(_lavoro(progetto), da))
         elif url.path == "/aiuto":
             corpo = (CARTELLA / "aiuto.html").read_bytes()
             self.send_response(200)

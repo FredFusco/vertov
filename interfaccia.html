@@ -374,7 +374,7 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
   <div role="tabpanel" id="scheda-risultato" hidden>
     <section class="passo">
       <h2>Descrizioni</h2>
-      <p class="spiega">Per un film di circa 2.000 inquadrature servono 7–12 ore. Puoi fermare e riprendere quando vuoi: riparte da dove si era interrotta. Se una descrizione è sbagliata, premi <em>Correggi</em>: la tua correzione viene estesa alle altre inquadrature della stessa scena. Se un personaggio ha il nome sbagliato, usa <em>Controlla i volti</em>.</p>
+      <p class="spiega">Per un film di circa 2.000 inquadrature servono 3–4 ore. Puoi fermare e riprendere quando vuoi: riparte da dove si era interrotta. Se una descrizione è sbagliata, premi <em>Correggi</em>: la tua correzione viene estesa alle altre inquadrature della stessa scena. Se un personaggio ha il nome sbagliato, usa <em>Controlla i volti</em>.</p>
       <div class="avviso-volti" id="avviso-volti" hidden></div>
       <div class="riga-azioni">
         <button class="bottone primario" id="avvia-descrizioni">Descrivi il film</button>
@@ -871,20 +871,51 @@ document.querySelectorAll("[data-comando]").forEach(b => b.onclick = () => verto
 /* ---------- risultato ---------- */
 function chiaveScena(r) { return r.scena || r.numero_scena || ""; }
 
-async function caricaRisultati() {
-  risultati = await api("/api/risultati");
-  disegnaRisultati();
+// Durante un'analisi si chiedono solo le righe nuove (da = posizione nel file): con un film
+// di migliaia di inquadrature rileggere e ridisegnare tutto a ogni inquadratura pesa.
+let risultatiFinoA = 0;
+const righeTabella = new Map();  // numero inquadratura -> riga della tabella
+async function caricaRisultati(tutto = true) {
+  const r = await api(`/api/risultati?da=${tutto ? 0 : risultatiFinoA}`);
+  risultatiFinoA = r.fine;
+  if (r.completo) { risultati = r.righe; return disegnaRisultati(); }
+  if (!r.righe.length) return;
+  const perNumero = new Map(risultati.map(x => [x.numero, x]));
+  for (const x of r.righe) perNumero.set(x.numero, x);
+  risultati = [...perNumero.values()].sort((a, b) => a.numero - b.numero);
+  if (inCorrezione !== null || !righeTabella.size) return disegnaRisultati();
+  const inAggiornamento = inAggiornamentoOra();
+  for (const x of r.righe) {
+    const nuova = rigaRisultato(x, inAggiornamento), vecchia = righeTabella.get(x.numero);
+    if (vecchia) vecchia.replaceWith(nuova);
+    else {
+      const dopo = [...righeTabella.keys()].filter(n => n > x.numero).sort((a, b) => a - b)[0];
+      $("#risultati").insertBefore(nuova, dopo === undefined ? null : righeTabella.get(dopo));
+    }
+    righeTabella.set(x.numero, nuova);
+  }
+}
+function inAggiornamentoOra() {
+  return new Set(ultimoLavoro && ultimoLavoro.attivo && ["correzione", "volti"].includes(ultimoLavoro.tipo) ? ultimoLavoro.rifai : []);
 }
 function disegnaRisultati() {
   if (inCorrezione !== null) return;  // non si ridisegna mentre l'utente scrive una correzione
   const t = $("#risultati");
   t.replaceChildren();
+  righeTabella.clear();
   if (!risultati.length) { const tr = crea("tr"); tr.appendChild(crea("td", "vuoto-msg", "Ancora nessuna inquadratura descritta.")); t.appendChild(tr); return; }
   const th = crea("tr");
   for (const h of ["N.", "Scena", "Timecode", "Piano", "Descrizione"]) th.appendChild(crea("th", "", h));
   t.appendChild(th);
-  const inAggiornamento = new Set(ultimoLavoro && ultimoLavoro.attivo && ["correzione", "volti"].includes(ultimoLavoro.tipo) ? ultimoLavoro.rifai : []);
+  const inAggiornamento = inAggiornamentoOra();
   for (const r of risultati) {
+    const tr = rigaRisultato(r, inAggiornamento);
+    righeTabella.set(r.numero, tr);
+    t.appendChild(tr);
+  }
+}
+function rigaRisultato(r, inAggiornamento) {
+  {
     const tr = crea("tr", inAggiornamento.has(r.numero) ? "aggiorna" : "");
     tr.appendChild(crea("td", "n", r.numero));
     const sc = crea("td");
@@ -917,7 +948,7 @@ function disegnaRisultati() {
     az.appendChild(b);
     d.appendChild(az);
     tr.appendChild(d);
-    t.appendChild(tr);
+    return tr;
   }
 }
 function apriCorrezione(r, cella, tr) {
@@ -928,7 +959,7 @@ function apriCorrezione(r, cella, tr) {
   const area = crea("textarea"); area.value = r.descrizione || "";
   area.setAttribute("aria-label", "Descrizione corretta dell'inquadratura " + r.numero);
   const nota = crea("div", "nota", stessaScena > 1
-    ? `Riscrivi la descrizione com'è davvero. Vertov la terrà così e aggiornerà di conseguenza le ${stessaScena} inquadrature della scena ${r.numero_scena || ""} (circa ${Math.ceil(stessaScena * 20 / 60)} min).`
+    ? `Riscrivi la descrizione com'è davvero. Vertov la terrà così e aggiornerà di conseguenza le ${stessaScena} inquadrature della scena ${r.numero_scena || ""} (circa ${Math.ceil(stessaScena * 8 / 60)} min).`
     : "Riscrivi la descrizione com'è davvero. Vertov la terrà così e aggiornerà i campi di questa inquadratura.");
   const az = crea("div", "riga-azioni");
   const ok = crea("button", "bottone primario", stessaScena > 1 ? "Applica alla scena" : "Applica");
@@ -1162,7 +1193,7 @@ async function aggiorna(subito) {
     statoVolti();
   } else if (l.attivo && l.avanzamento.descrizioni) {
     const n = l.avanzamento.descrizioni.fatti;
-    if (n !== aggiorna.ultimoN) { aggiorna.ultimoN = n; caricaRisultati(); }
+    if (n !== aggiorna.ultimoN) { aggiorna.ultimoN = n; caricaRisultati(false); }
   } else if (subito || !eraAttivo !== !l.attivo) {
     disegnaRisultati();  // righe in aggiornamento e pulsanti Correggi seguono il lavoro in corso
   }
