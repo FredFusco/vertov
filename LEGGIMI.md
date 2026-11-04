@@ -58,13 +58,14 @@ Se interrompi l'elaborazione, rilanciando lo stesso comando riparte da dove si e
 
 ## Risultati (nella cartella `--out`)
 
-Dall'app, `--out` è la cartella di lavoro della sessione (`file di lavoro/<sessione>` dentro la cartella di Vertov, esclusa da `.gitignore` e quindi mai pubblicata): l'utente non la vede. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app sposta nella cartella di lavoro i file che le versioni precedenti lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
+Dall'app, `--out` è la cartella di lavoro della sessione (`file di lavoro/<sessione>` dentro la cartella di Vertov, esclusa da `.gitignore` e quindi mai pubblicata): l'utente non la vede. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Avid.txt`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app sposta nella cartella di lavoro i file che le versioni precedenti lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
 
 A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi `progresso.py`); l'app le mostra nel riquadro dell'esito insieme all'eventuale errore.
 
 - `inquadrature.csv`: si apre in Excel. Una riga per inquadratura con piano, movimento di macchina, personaggi, azione, ambiente, luce, dialoghi, battute del copione, sonoro, suoni rilevati e descrizione
 - `inquadrature.jsonl`: gli stessi dati in formato completo, compresi volti riconosciuti e livelli audio
 - `marker_resolve.edl`: in DaVinci Resolve, *Timeline > Import > Timeline Markers from EDL* mette ogni descrizione come marker sulla timeline
+- `marker_avid.txt`: in Avid Media Composer, finestra *Markers* › menu › *Import Markers* (formato di testo con tabulazioni, come Murnau; marker verdi sulla traccia V1)
 - `volti/volti.html` e `volti/nomi.txt`: controllo e correzione dei personaggi
 - `personaggi.txt`: le schede estratte dalla sceneggiatura, da copiare e correggere per `--personaggi`
 - `dialoghi_trascritti.srt`: creato solo con `--trascrivi`

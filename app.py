@@ -712,11 +712,19 @@ def apri_report() -> None:
 # dopo il nome della sessione.
 ESPORTAZIONI = {
     "csv": ("inquadrature.csv", "descrizioni.csv"),
+    "avid": ("marker_avid.txt", "marker Avid.txt"),
     "resolve": ("marker_resolve.edl", "marker Resolve.edl"),
     "report": ("report_vertov.html", "report.html"),
     "dialoghi": ("dialoghi_trascritti.srt", "dialoghi.srt"),
     "dati": ("inquadrature.jsonl", "dati.jsonl"),
 }
+
+
+def _marker_avid_mancanti(lavoro: Path) -> None:
+    """Le sessioni analizzate prima che Vertov scrivesse i marker per Avid: li si crea dalle descrizioni."""
+    if (lavoro / "inquadrature.jsonl").exists() and not (lavoro / "marker_avid.txt").exists():
+        import descrivi
+        descrivi.scrivi_marker_avid(leggi_risultati(lavoro), lavoro / "marker_avid.txt")
 
 
 def esporta(p: dict, formati: list) -> list:
@@ -731,6 +739,8 @@ def esporta(p: dict, formati: list) -> list:
     materiali, creati = materiali_di(p), []
     for f in formati:
         sorgente, suffisso = ESPORTAZIONI[f]
+        if f == "avid":
+            _marker_avid_mancanti(_lavoro(p))
         if not (_lavoro(p) / sorgente).exists():
             raise RuntimeError("Non c'è ancora niente da esportare: prima descrivi il film.")
         file = dest / f"{nome_per_file(p.get('nome'))} - {suffisso}"
@@ -858,7 +868,8 @@ class Gestore(BaseHTTPRequestHandler):
                         "volti_proposti": sum(1 for g in leggi_gruppi(out) if g.get("nome") and not g.get("confermato")
                                               and g["nome"] != "comparsa"),
                         "report_pronto": (out / "report_vertov.html").exists(),
-                        "esportabili": {k: (out / v[0]).exists() for k, v in ESPORTAZIONI.items()},
+                        "esportabili": {k: (out / v[0]).exists() or (k == "avid" and (out / "inquadrature.jsonl").exists())
+                                        for k, v in ESPORTAZIONI.items()},
                         "prerequisiti": ricordato("prerequisiti", 10, prerequisiti), "personaggi": personaggi})
         elif url.path == "/api/sessioni":
             self._json({"corrente": progetto["id"], "sessioni": elenco_sessioni()})

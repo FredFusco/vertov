@@ -989,12 +989,13 @@ function apriCorrezione(r, cella, tr) {
 // Esportazione: i formati scelti, con il nome della sessione, nella cartella di destinazione.
 const FORMATI = {
   csv: ["Foglio di calcolo", "descrizioni.csv", "Le descrizioni di ogni inquadratura, per Excel, Numbers o Google Fogli."],
+  avid: ["Marker per Avid Media Composer", "marker Avid.txt", "In Media Composer: finestra Markers › menu › Import Markers. Verdi, per distinguerli da quelli di Murnau."],
   resolve: ["Marker per DaVinci Resolve", "marker Resolve.edl", "In Resolve: Timeline › Import › Timeline Markers from EDL."],
   report: ["Report", "report.html", "Si apre nel browser; da lì puoi salvarlo in PDF."],
   dialoghi: ["Trascrizione dei dialoghi", "dialoghi.srt", "Sottotitoli con i dialoghi trascritti da Whisper."],
   dati: ["Dati completi", "dati.jsonl", "Tutto ciò che Vertov sa di ogni inquadratura, per altri programmi."],
 };
-const FORMATI_PREDEFINITI = ["csv", "resolve", "report"];
+const FORMATI_PREDEFINITI = ["csv", "avid", "report"];
 let esportabili = {}, firmaFormati = "";
 function nomeSessioneFile(t) { return (t || "").replace(/[\\/:\x00-\x1f]/g, "-").replace(/^[ .]+|[ .]+$/g, "") || "Sessione"; }
 function disegnaFormati() {

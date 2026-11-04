@@ -758,6 +758,19 @@ def scrivi_marker_resolve(risultati: list, percorso: Path, fps: float) -> None:
     percorso.write_text("\n".join(righe), encoding="utf-8")
 
 
+def scrivi_marker_avid(risultati: list, percorso: Path) -> None:
+    """Marker per Avid Media Composer (finestra Markers › menu › Import Markers).
+
+    Lo stesso formato di testo che usa Murnau, separato da tabulazioni: utente, timecode, traccia,
+    colore, commento, durata. Verde, per distinguerli a colpo d'occhio dai marker di Murnau."""
+    righe = []
+    for r in risultati:
+        scena = f'Sc. {r["numero_scena"]} · ' if r.get("numero_scena") else ""
+        nota = re.sub(r"\s+", " ", f'{scena}{r["piano"]} - {r["descrizione"]}').strip()
+        righe.append(f'Vertov\t{r["tc_in"]}\tV1\tgreen\t{nota}\t1')
+    percorso.write_text("\n".join(righe) + "\n", encoding="utf-8")
+
+
 def prepara_tracce(args, fps: float, tc_inizio_s: float) -> list:
     """Raccoglie le tracce audio e calcola il loro allineamento al video."""
     richieste = [("dialoghi", args.audio_dialoghi), ("sfx", args.audio_sfx),
@@ -1093,6 +1106,7 @@ def scrivi_risultati(args, fatte: dict, fps: float, rifai: set, nuove: int, avvi
                           encoding="utf-8")
     scrivi_csv(risultati, args.out / "inquadrature.csv")
     scrivi_marker_resolve(risultati, args.out / "marker_resolve.edl", fps)
+    scrivi_marker_avid(risultati, args.out / "marker_avid.txt")
 
     # Registro del lavoro (per il report): fonte dei tagli, sequenza, tempi di ogni elaborazione.
     file_lavoro = args.out / "lavoro.json"
