@@ -33,6 +33,7 @@ from pathlib import Path
 import audio
 import coordinamento
 import modello as modulo_modello
+import movimento as modulo_movimento
 import odg
 import progresso
 import volti as modulo_volti
@@ -615,7 +616,7 @@ dal copione, l'attore potrebbe aver cambiato le parole: riporta la trascrizione.
 
 def costruisci_prompt(q: Inquadratura, vicini: list, max_scena: int, sonoro: str = "",
                       personaggi: dict = None, convocati: dict = None, volti: str = "",
-                      precedenti: list = (), correzioni: list = ()) -> str:
+                      precedenti: list = (), correzioni: list = (), movimento: str = "") -> str:
     parti = [ISTRUZIONI, "",
              f"Inquadratura n. {q.numero}, timecode {q.tc_in} - {q.tc_out} "
              f"(durata {q.fine - q.inizio:.1f} s)."]
@@ -673,6 +674,8 @@ def costruisci_prompt(q: Inquadratura, vicini: list, max_scena: int, sonoro: str
                   + "; ".join(q.clip_audio[:12])]
     if sonoro:
         parti += ["", sonoro]
+    if movimento:
+        parti += ["", movimento]
     if vicini:
         parti += ["", "Personaggi riconosciuti nelle inquadrature vicine della stessa scena: "
                   + ", ".join(vicini) + ". Ti servono per dare un nome a chi si vede di spalle, di "
@@ -976,7 +979,7 @@ def volti_della_selezione(args, selezione: list, file_jsonl: Path, rifai: set, c
 
 def descrivi_selezione(args, inquadrature: list, selezione: list, fatte: dict, foto_tutte: dict,
                        volti_per_inq: dict, personaggi: dict, presenze: dict, correzioni: dict,
-                       tracce: list, riconoscitore, file_jsonl: Path) -> int:
+                       tracce: list, riconoscitore, file_jsonl: Path, ritaglio: str = None) -> int:
     """Descrive le inquadrature non ancora fatte, scrivendole subito nel file. Restituisce quante sono nuove."""
     # Nomi noti dei personaggi, per riconoscerli nelle risposte delle inquadrature vicine.
     noti = set(personaggi) | {v["nome"] for vv in volti_per_inq.values() for v in vv
@@ -1023,6 +1026,9 @@ def descrivi_selezione(args, inquadrature: list, selezione: list, fatte: dict, f
     inizio_lavoro = time.time()
     nuove = 0
     senza_fotogrammi, fallite, di_fila = [], [], 0
+    # Movimento della macchina misurato sui fotogrammi: salvato, così una ripresa non lo rifà.
+    file_movimento = args.out / "movimento.json"
+    misure = modulo_movimento.carica(file_movimento)
     fatte_qui = sum(1 for x in selezione if x.numero in fatte)
     progresso.fase("descrizioni")
     with file_jsonl.open("a", encoding="utf-8") as out:
@@ -1035,13 +1041,23 @@ def descrivi_selezione(args, inquadrature: list, selezione: list, fatte: dict, f
                 senza_fotogrammi.append(q.numero)
                 continue
             analisi = audio.analizza_inquadratura(tracce, riconoscitore, q.inizio, q.fine) if tracce else {}
+            chiave_mov = f"{q.numero}:{q.tc_in}"
+            if chiave_mov not in misure:
+                try:
+                    misure[chiave_mov] = modulo_movimento.misura(args.video, q.inizio, q.fine, ritaglio)
+                except Exception as e:  # la misura è un aiuto: se non riesce si descrive senza
+                    print(f"[{q.numero}] movimento non misurato: {e}")
+                    misure[chiave_mov] = {}
+                modulo_movimento.salva(file_movimento, misure)
+            mov = misure[chiave_mov]
             prompt = costruisci_prompt(q, vicini_di(q), max_scena=3000,
                                        sonoro=audio.testo_per_prompt(analisi) if analisi else "",
                                        personaggi=personaggi,
                                        convocati=presenze.get(q.scena.numero if q.scena else ""),
                                        volti=modulo_volti.testo_per_prompt(volti_per_inq[q.numero])
                                        if q.numero in volti_per_inq else "",
-                                       precedenti=precedenti_di(q), correzioni=correzioni_di(q))
+                                       precedenti=precedenti_di(q), correzioni=correzioni_di(q),
+                                       movimento=modulo_movimento.testo_per_prompt(mov))
             t0 = time.time()
             try:
                 desc = chiedi_al_modello(args.modello, prompt, foto)
@@ -1068,6 +1084,7 @@ def descrivi_selezione(args, inquadrature: list, selezione: list, fatte: dict, f
                 "volti": volti_per_inq.get(q.numero, []),
                 **desc,
                 "audio": analisi,
+                "movimento_misurato": mov,
             }
             if q.numero in correzioni:
                 # La descrizione del montatore comprende già i dialoghi: il riassunto del
@@ -1181,8 +1198,9 @@ def main() -> None:
     selezione = [q for q in inquadrature if q.numero >= args.da and (args.a is None or q.numero <= args.a)]
     if rifai:
         selezione = [q for q in selezione if q.numero in rifai]
-        for n in rifai:
-            fatte.pop(n, None)
+        # Le descrizioni di prima si tengono da parte: se il rifacimento di un'inquadratura non
+        # riesce, resta quella vecchia invece di sparire dai risultati.
+        di_prima = {n: fatte.pop(n) for n in rifai if n in fatte}
 
     # Correzioni del montatore: {numero inquadratura: descrizione giusta}.
     file_correzioni = args.out / "correzioni.json"
@@ -1205,7 +1223,10 @@ def main() -> None:
         return
 
     nuove = descrivi_selezione(args, inquadrature, selezione, fatte, foto_tutte, volti_per_inq, personaggi,
-                               presenze, correzioni, tracce, riconoscitore, file_jsonl)
+                               presenze, correzioni, tracce, riconoscitore, file_jsonl, ritaglio)
+    if rifai:
+        for n, r in di_prima.items():
+            fatte.setdefault(n, r)
     scrivi_risultati(args, fatte, fps, rifai, nuove, avvio)
 
 

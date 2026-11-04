@@ -74,6 +74,11 @@ A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi
 
 Su M5 Max servono circa 6 secondi per inquadratura (descrizione 3–6 s, volti, sonoro e fotogrammi circa 2 s). Per un film di 2.000 inquadrature sono 3–4 ore, più la trascrizione con Whisper. A batteria il processore grafico va a metà velocità. Alla ripresa i volti già trovati si rileggono da `volti/rilevamenti/` e non si richiedono al modello i gruppi già esaminati.
 
+## Volti e movimento
+
+- `volti.py`: sui fotogrammi con luce colorata o scarsa (dominante di colore o luminosità bassa in Lab) i volti si cercano dopo bianco medio e CLAHE, con una soglia di rilevamento più alta (`PUNTEGGIO_CORRETTA`) per non creare falsi volti. Misurato su una festa con luci viola: +26% di volti riconosciuti, nessun falso; di giorno nulla cambia. I rilevamenti sono salvati per inquadratura in `volti/rilevamenti/` (con `VERSIONE_RILEVAMENTI`).
+- `movimento.py`: per ogni inquadratura fotogrammi a 6 al secondo, 320 pixel, in grigi; tra fotogrammi successivi punti ORB e trasformazione RANSAC (bande alta e bassa escluse per il timecode impresso). Conta solo il movimento costante (passo tipico, direzione concorde nel 65% dei passi): panoramica o carrello laterale, verticale, avanzamento o zoom, tremolio da macchina a mano. Provato su movimenti costruiti (direzione e ampiezza giuste) e su un rullo vero. Le misure stanno in `movimento.json` e vanno nel prompt come dato indicativo.
+
 ## Il modello
 
 Tutte le richieste al modello di visione (descrizioni, nomi dei volti, sinossi del report) passano da `modello.py`:

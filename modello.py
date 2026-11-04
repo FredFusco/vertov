@@ -57,10 +57,18 @@ def _estrai_json(testo: str) -> str:
 
 def _conforma(dati, schema: dict) -> dict:
     """Ogni campo richiesto dallo schema, del tipo giusto. Solleva ValueError se manca qualcosa di essenziale."""
+    if isinstance(dati, list) and len(dati) == 1:
+        dati = dati[0]
+    if isinstance(dati, dict) and "properties" in dati and dati.get("type") == "object":
+        raise ValueError("il modello ha riscritto lo schema invece di compilarlo")
     if not isinstance(dati, dict):
         raise ValueError("la risposta non è un oggetto JSON")
     # Alcuni modelli rinominano i campi con spazi o maiuscole (" descrizione", "Descrizione").
     dati = {str(k).strip().lower(): v for k, v in dati.items()}
+    # ...o li avvolgono in un oggetto in più ({"inquadratura": {...}}).
+    richiesti = set(schema.get("required", []))
+    if len(dati) == 1 and isinstance(next(iter(dati.values())), dict) and not richiesti & set(dati):
+        dati = {str(k).strip().lower(): v for k, v in next(iter(dati.values())).items()}
     proprieta = schema.get("properties", {})
     risultato = {}
     for campo, tipo in proprieta.items():
@@ -97,14 +105,19 @@ def chiedi(prompt: str, immagini: list = (), schema: dict = None, modello: str =
     mlx = _formato(modello) == "safetensors"
     testo = prompt
     if schema and mlx:
-        testo += ("\n\nRispondi SOLO con un oggetto JSON valido, senza altro testo prima o dopo, che rispetti "
-                  "questo schema JSON (tutti i campi, con questi nomi):\n" + json.dumps(schema, ensure_ascii=False))
+        # Un modulo da compilare, non lo schema tecnico: con lo schema i modelli a volte lo riscrivono
+        # tale e quale invece di riempirlo.
+        modulo = {c: (["…"] if t.get("type") == "array" else ("uno tra: " + ", ".join(t["enum"]) if "enum" in t else "…"))
+                  for c, t in schema.get("properties", {}).items()}
+        testo += ("\n\nRispondi SOLO con un oggetto JSON valido, senza altro testo prima o dopo, con esattamente "
+                  "questi campi compilati con i tuoi valori (non ripetere questo modello):\n"
+                  + json.dumps(modulo, ensure_ascii=False))
     corpo = {"model": modello, "stream": False, "think": False, "keep_alive": coordinamento.TENUTA,
              "messages": [{"role": "user", "content": testo, "images": list(immagini)}],
              "options": {"temperature": temperatura, "num_ctx": coordinamento.CONTESTO, **opzioni}}
     if schema and not mlx:
         corpo["format"] = schema
-    errore = None
+    errore, contenuto = None, ""
     for tentativo in range(1, tentativi + 1):
         try:
             richiesta = urllib.request.Request(f"{OLLAMA}/api/chat", data=json.dumps(corpo).encode(),
@@ -112,7 +125,7 @@ def chiedi(prompt: str, immagini: list = (), schema: dict = None, modello: str =
             with urllib.request.urlopen(richiesta, timeout=timeout) as r:
                 risposta = json.load(r)
             _controlla_contesto(modello, risposta)
-            contenuto = risposta["message"]["content"]
+            contenuto = risposta["message"]["content"] or ""
             if not schema:
                 return {"testo": contenuto.strip()}
             return _conforma(json.loads(_estrai_json(contenuto)), schema)
@@ -123,7 +136,8 @@ def chiedi(prompt: str, immagini: list = (), schema: dict = None, modello: str =
             errore = e
         except (OSError, ValueError, KeyError, TypeError) as e:
             # OSError comprende URLError, tempo scaduto, connessione chiusa o rifiutata.
-            errore = e
+            # Con una risposta non valida si riporta il suo inizio, per capire che cosa ha scritto il modello.
+            errore = ValueError(f"{e} (risposta: {contenuto[:200]!r})") if isinstance(e, ValueError) and contenuto else e
         if tentativo < tentativi:
             time.sleep(3 * tentativo)
     raise ErroreModello(f"il modello non ha risposto correttamente: {errore}")
