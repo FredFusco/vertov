@@ -437,6 +437,21 @@ body.trascinando .zona { border-color: var(--ocra); border-style: dashed; backgr
 </div>
 
 <!-- Finestra per liberare spazio -->
+<div class="velo" id="finestra-impostazioni" hidden role="dialog" aria-modal="true" aria-labelledby="titolo-impostazioni">
+  <div class="foglio" style="width:min(560px,100%)">
+    <div class="foglio-testa"><h2 id="titolo-impostazioni">Impostazioni</h2></div>
+    <div class="foglio-corpo">
+      <label class="novita-voce"><input type="checkbox" id="imp-conferma">
+        <div><b>Chiedi conferma prima di chiudere Vertov</b>
+          <div class="spiega">Se c'è un'analisi in corso Vertov chiede sempre: chiudere la fermerebbe.</div></div></label>
+      <label class="novita-voce"><input type="checkbox" id="imp-aggiornamenti">
+        <div><b>Controlla gli aggiornamenti all'avvio</b>
+          <div class="spiega">Al massimo una volta al giorno; chiede sempre prima di installare.</div></div></label>
+    </div>
+    <div class="foglio-piede"><button class="bottone primario" id="imp-chiudi">Chiudi</button></div>
+  </div>
+</div>
+
 <div class="velo" id="finestra-pulizia" hidden role="dialog" aria-modal="true" aria-labelledby="titolo-pulizia">
   <div class="foglio" style="width:min(600px,100%)">
     <div class="foglio-testa">
@@ -520,7 +535,17 @@ const NOMI_FASI = {
 let progetto = {}, ultimoLavoro = null, personaggiCaricati = false, risultati = [], inCorrezione = null;
 
 const $ = s => document.querySelector(s);
+// Dentro Vertov.app (mac/Vertov.swift) le finestre di scelta dei file le apre l'app: la pagina gliele chiede
+// prima della richiesta e manda al server i percorsi scelti («percorsi», vuoto se si annulla). Con la finestra
+// di pywebview (app.py senza --servizio) le apre il server, come prima.
+const NATIVO = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vertov);
+const SCELTE = {
+  "/api/sfoglia": d => ({ tipo: d.tipo || "file", multipli: d.tipo !== "cartella" }),
+  "/api/scegli": d => ({ tipo: d.tipo === "cartella" ? "esporta" : d.tipo || "file", multipli: false }),
+};
 async function api(percorso, dati) {
+  const scelta = NATIVO && SCELTE[percorso] && SCELTE[percorso](dati || {});
+  if (scelta) dati = { ...dati, percorsi: await window.webkit.messageHandlers.vertov.postMessage({ scegli: scelta }) };
   const r = await fetch(percorso, dati === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dati) });
   const j = await r.json();
@@ -744,7 +769,17 @@ $("#cambia-out").onclick = async () => {
 let contaTrascina = 0;
 document.addEventListener("dragenter", e => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { contaTrascina++; document.body.classList.add("trascinando"); } });
 document.addEventListener("dragleave", () => { if (--contaTrascina <= 0) { contaTrascina = 0; document.body.classList.remove("trascinando"); } });
-document.addEventListener("drop", () => { contaTrascina = 0; document.body.classList.remove("trascinando"); mostraScheda("materiali"); });
+// Il file lasciato non va aperto dalla pagina: i percorsi completi li manda il lato nativo (Vertov.app o pywebview).
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => { e.preventDefault(); contaTrascina = 0; document.body.classList.remove("trascinando"); mostraScheda("materiali"); });
+// File e cartelle trascinati sulla finestra o sull'icona nel Dock, o aperti dal Finder con «Apri con»:
+// Vertov.app manda qui i percorsi completi.
+async function aggiungiPercorsi(percorsi) {
+  mostraScheda("materiali");
+  materialiInArrivo(percorsi.length);
+  try { await materialiAggiunti((await api("/api/aggiungi", { percorsi })).esiti); }
+  catch (e) { testo($("#esito-arrivo"), e.message); $("#esito-arrivo").className = "esito-arrivo"; }
+}
 $("#trascrivi").onchange = e => api("/api/progetto", { trascrivi: e.target.checked });
 
 /* ---------- finestra dei volti ---------- */
@@ -851,7 +886,10 @@ async function vertovComando(nome) {
       }
       case "aggiungi-file": mostraScheda("materiali"); return clic('[data-sfoglia="file"]');
       case "aggiungi-cartella": mostraScheda("materiali"); return clic('[data-sfoglia="cartella"]');
-      case "report-apri": await api("/api/report", {}); return;
+      case "report-apri":
+        await api("/api/report", {});
+        if (NATIVO) window.webkit.messageHandlers.vertov.postMessage({ finestra: "report" });
+        return;
       case "esporta": mostraScheda("esporta"); $("#esegui-esporta").focus(); return;
       case "vista-esporta": return mostraScheda("esporta");
       case "lavoro": await api("/api/apri", { cosa: "lavoro" }); return;
@@ -861,6 +899,7 @@ async function vertovComando(nome) {
       case "volti": mostraScheda("risultato"); return apriVolti();
       case "aggiornamenti": return cercaAggiornamenti(true);
       case "pulizia": return apriPulizia();
+      case "impostazioni": return apriImpostazioni();
       case "descrivi": return avvia("descrizioni");
       case "ferma": return clic("#ferma");
     }
@@ -1343,7 +1382,20 @@ document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   if (!$("#finestra-aggiornamenti").hidden) chiudiAggiornamenti();
   if (!$("#finestra-pulizia").hidden) chiudiPulizia();
+  $("#finestra-impostazioni").hidden = true;
 });
+async function apriImpostazioni() {
+  const p = await api("/api/preferenze");
+  $("#imp-conferma").checked = !p.chiudi_senza_chiedere;
+  $("#imp-aggiornamenti").checked = p.automatico;
+  $("#finestra-impostazioni").hidden = false;
+}
+$("#imp-conferma").onchange = e => api("/api/preferenze", { chiudi_senza_chiedere: !e.target.checked });
+$("#imp-aggiornamenti").onchange = e => {
+  aggAutomatico = e.target.checked;
+  api("/api/aggiornamenti", { azione: "automatico", valore: aggAutomatico });
+};
+$("#imp-chiudi").onclick = () => $("#finestra-impostazioni").hidden = true;
 
 aggiorna().then(() => { $("#nome-sessione").value = progetto.nome || ""; if (progetto.out) { caricaVolti(); caricaRisultati(); }
   setTimeout(() => cercaAggiornamenti(false), 3000); });

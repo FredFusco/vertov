@@ -60,8 +60,19 @@ def _modelli_hf_non_usati() -> list:
     return esito
 
 
-# Le app sorelle (Murnau, Ozu...) stanno accanto alla cartella di Vertov.
-FAMIGLIA = Path(__file__).resolve().parent.parent
+# Le app sorelle (Murnau, Ozu...): il loro codice sorgente sta accanto a quello di Vertov in My Drive/CLAUDE,
+# e le app installate hanno il programma dentro, in Contents/Resources/programma. Si guardano tutti e due:
+# un'app installata senza la cartella del codice, o un codice non ancora installato, contano lo stesso.
+CODICE_FAMIGLIA = Path.home() / "My Drive" / "CLAUDE"
+APP_INSTALLATE = Path.home() / "Applications"
+
+
+def _programmi_della_famiglia():
+    """(file .py, nome dell'app) di ogni app della famiglia, dal codice sorgente e dalle app installate."""
+    for f in CODICE_FAMIGLIA.glob("*/*.py"):
+        yield f, f.parent.name.capitalize()
+    for f in APP_INSTALLATE.glob("*.app/Contents/Resources/programma/*.py"):
+        yield f, f.parents[3].stem
 
 
 def modelli_protetti(modello: str) -> dict:
@@ -71,12 +82,11 @@ def modelli_protetti(modello: str) -> dict:
     (MODELLO = "gemma4:26b", REVISORE = "qwen3.8:27b-dflash2-nvfp4"...): così la scelta nuova
     di un'app sorella è protetta senza dover cambiare Vertov."""
     protetti = {modello: {"Vertov"}}
-    for f in FAMIGLIA.glob("*/*.py"):
+    for f, app in _programmi_della_famiglia():
         try:
             testo = f.read_text(errors="ignore")
         except OSError:
             continue
-        app = "Vertov" if f.parent == Path(__file__).resolve().parent else f.parent.name.capitalize()
         for nome in re.findall(r'^\s*[A-Z][A-Z0-9_]* *= *"([\w.:/-]+:[\w.:-]+)"', testo, re.M):
             if "//" not in nome:  # indirizzi come http://localhost:11434, non modelli
                 protetti.setdefault(nome, set()).add(app)

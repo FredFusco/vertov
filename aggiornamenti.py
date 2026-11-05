@@ -2,9 +2,12 @@
 
 Si controllano:
 - Vertov stesso: un file di annuncio (JSON) pubblicato online, il cui indirizzo è
-  in aggiornamenti.json accanto all'app, dice qual è l'ultima versione e dove
-  scaricarla. Il pacchetto è uno zip con i file dell'app, verificato con SHA-256;
-  i file sostituiti vengono conservati per poter tornare indietro.
+  in aggiornamenti.json accanto al programma, dice qual è l'ultima versione e dove
+  scaricarla. Il pacchetto è uno zip con dentro Vertov.app completa (l'app nativa con
+  dentro il programma), verificato con SHA-256: la nuova app si prepara accanto a quella
+  installata e le due si scambiano; quella di prima va in versioni_precedenti, per poter
+  tornare indietro. Dal codice sorgente non si installa: si aggiorna con git e
+  mac/compila.sh --installa.
 - i programmi installati con Homebrew: ffmpeg (video e audio) e Ollama (che fa
   girare il modello di visione);
 - le librerie Python dell'ambiente di Vertov (pywebview, OpenCV, mlx-whisper,
@@ -42,8 +45,11 @@ OLLAMA = "http://localhost:11434"
 REGISTRO = "https://registry.ollama.ai/v2"
 HF_CACHE = Path.home() / ".cache" / "huggingface" / "hub"
 OGNI = 24 * 3600  # controllo automatico al massimo una volta al giorno
-# Cartelle dell'app che un aggiornamento non tocca mai.
-INTOCCABILI = {"prova_reale", "dist", "__pycache__"}
+# Il programma sta dentro Vertov.app, in Contents/Resources/programma (vedi mac/compila.sh): un aggiornamento
+# sostituisce tutta l'app. APP è None quando si usa il codice sorgente (che si aggiorna con git e
+# mac/compila.sh --installa).
+PROGRAMMA_NELL_APP = Path("Contents") / "Resources" / "programma"
+APP = CARTELLA.parents[2] if CARTELLA.parent.name == "Resources" and CARTELLA.parents[2].suffix == ".app" else None
 
 PROGRAMMI = {"ffmpeg": "legge video e audio, estrae i fotogrammi",
              "ollama": "fa girare il modello di visione sul Mac"}
@@ -247,6 +253,9 @@ def _fase(fase: str, fatti: int = 0, totale: int = 0) -> None:
 
 
 def _installa_app(voce: dict) -> None:
+    if APP is None:
+        raise RuntimeError("Questo è il codice sorgente di Vertov, non l'app installata: si aggiorna con git e "
+                           "mac/compila.sh --installa.")
     _fase("Scarico Vertov " + voce["nuova"] + " (KB)")
     if not _sicuro(voce["pacchetto"]):
         raise RuntimeError("Il pacchetto deve essere scaricato via https.")
@@ -262,40 +271,46 @@ def _installa_app(voce: dict) -> None:
                 _fase(INSTALLAZIONE["fase"], f.tell() // 1024, totale // 1024)
         if impronta.hexdigest() != voce["sha256"]:
             raise RuntimeError("Il pacchetto scaricato non corrisponde all'impronta annunciata: non lo installo.")
-
-        _fase("Controllo il pacchetto")
-        estratti = Path(tmp) / "nuova"
-        with zipfile.ZipFile(zip_) as z:
-            for nome in z.namelist():
-                destinazione = (estratti / nome).resolve()
-                if estratti.resolve() not in destinazione.parents and destinazione != estratti.resolve():
-                    raise RuntimeError("Il pacchetto contiene percorsi non validi.")
-            z.extractall(estratti)
-            # extractall non conserva i permessi: senza, il lanciatore di Vertov.app non sarebbe più eseguibile.
-            for info in z.infolist():
-                permessi = info.external_attr >> 16 & 0o777
-                if permessi and not info.is_dir():
-                    (estratti / info.filename).chmod(permessi)
-        radice = estratti
-        voci = [p for p in estratti.iterdir() if p.name != "__MACOSX"]
-        if len(voci) == 1 and voci[0].is_dir():
-            radice = voci[0]
-        if not (radice / "app.py").exists() or not (radice / "descrivi.py").exists():
-            raise RuntimeError("Il pacchetto non contiene Vertov.")
-
         _fase("Installo Vertov " + voce["nuova"])
-        copia = PRECEDENTI / versione()
-        for sorgente in sorted(radice.rglob("*")):
-            rel = sorgente.relative_to(radice)
-            if rel.parts[0] in INTOCCABILI or sorgente.name == ".DS_Store" or sorgente.is_dir():
-                continue
-            bersaglio = CARTELLA / rel
-            if bersaglio.exists():
-                (copia / rel).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(bersaglio, copia / rel)
-            bersaglio.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(sorgente, bersaglio)
+        scambia_app(zip_, Path(tmp) / "nuova")
     INSTALLAZIONE["riavvia"] = True
+
+
+def scambia_app(zip_: Path, estratti: Path) -> None:
+    """Estrae Vertov.app dal pacchetto e la scambia con quella installata (APP).
+
+    La nuova si prepara accanto a quella in uso e poi le due si scambiano con os.replace: il Vertov aperto
+    continua a girare fino al riavvio. Mai riscrivere i file dell'app in uso: macOS la chiuderebbe di colpo.
+    Quella di prima va in versioni_precedenti, per poter tornare indietro."""
+    with zipfile.ZipFile(zip_) as z:
+        for nome in z.namelist():
+            destinazione = (estratti / nome).resolve()
+            if estratti.resolve() not in destinazione.parents and destinazione != estratti.resolve():
+                raise RuntimeError("Il pacchetto contiene percorsi non validi.")
+        z.extractall(estratti)
+        # extractall non conserva i permessi: senza, l'eseguibile di Vertov.app non sarebbe più eseguibile.
+        for info in z.infolist():
+            permessi = info.external_attr >> 16 & 0o777
+            if permessi and not info.is_dir():
+                (estratti / info.filename).chmod(permessi)
+    nuova = estratti / "Vertov.app"
+    if not (nuova / "Contents" / "MacOS" / "Vertov").exists() or not (nuova / PROGRAMMA_NELL_APP / "app.py").exists():
+        raise RuntimeError("Il pacchetto non contiene Vertov.")
+    accanto = APP.with_name(".Vertov.app.nuova")
+    shutil.rmtree(accanto, ignore_errors=True)
+    shutil.copytree(nuova, accanto, symlinks=True)
+    copia = PRECEDENTI / versione()
+    shutil.rmtree(copia, ignore_errors=True)
+    copia.mkdir(parents=True)
+    try:
+        os.replace(APP, copia / "Vertov.app")
+    except OSError:  # su un altro disco non si può spostare: la si copia e poi la si toglie
+        vecchia = APP.with_name(".Vertov.app.vecchia")
+        shutil.rmtree(vecchia, ignore_errors=True)
+        os.replace(APP, vecchia)
+        shutil.copytree(vecchia, copia / "Vertov.app", symlinks=True)
+        shutil.rmtree(vecchia, ignore_errors=True)
+    os.replace(accanto, APP)
 
 
 def _installa_programmi(nomi: list) -> None:
@@ -402,9 +417,11 @@ def installa(voci: list, modello: str) -> None:
 
 
 def riavvia(porta: int) -> None:
-    """Riapre Vertov appena questa istanza ha liberato la porta del server."""
-    bundle = CARTELLA / "Vertov.app"
-    apri = ["open", str(bundle)] if bundle.exists() else [sys.executable, str(CARTELLA / "app.py")]
+    """Riapre Vertov appena questa istanza ha liberato la porta del server: la stessa Vertov.app da cui è stato
+    aperto (Vertov.app lo dice al server con VERTOV_APP), o il programma dal Terminale."""
+    scelta = Path(os.environ.get("VERTOV_APP", ""))
+    bundle = scelta if os.environ.get("VERTOV_APP") and scelta.exists() else APP
+    apri = ["open", str(bundle)] if bundle and bundle.exists() else [sys.executable, str(CARTELLA / "app.py")]
     script = (f"for i in $(seq 1 60); do nc -z 127.0.0.1 {porta} || break; sleep 0.5; done; "
               + " ".join(f"'{a}'" for a in apri))
     subprocess.Popen(["/bin/sh", "-c", script], start_new_session=True,

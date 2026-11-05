@@ -1,7 +1,0 @@
-#!/bin/bash
-# Avvia Vertov con l'ambiente Python del descrittore.
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-mkdir -p "$HOME/.cache/descrittore"
-# Vertov.app sta nella cartella del programma: si parte da lì, ovunque sia.
-cd "$(dirname "$0")/../../.." || exit 1
-exec "$HOME/.venvs/descrittore/bin/python" app.py >> "$HOME/.cache/descrittore/vertov.log" 2>&1

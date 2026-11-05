@@ -17,6 +17,10 @@ li { margin:4px 0; }
 <h1>Guida di Vertov</h1>
 <p class="sotto">Il cine-occhio che descrive ogni inquadratura del tuo film</p>
 
+<h2>L'app</h2>
+<p>Vertov sta nella cartella Applicazioni: la trovi con Spotlight o Launchpad e la puoi tenere nel Dock. Puoi trascinare video, montaggi, audio, documenti o una cartella anche sull'icona di Vertov nel Dock, o aprirli dal Finder con <i>Apri con › Vertov</i>. Durante un'analisi la percentuale compare sull'icona nel Dock. Le preferenze sono in <i>Vertov › Impostazioni…</i> <kbd>⌘,</kbd>.</p>
+<p>Chiudendo Vertov compare un riquadro di conferma; con <b>Non mostrare più</b> le volte successive si chiude subito (ma chiede sempre se un'analisi è in corso). Per riavere il riquadro: <i>Vertov › Impostazioni…</i>.</p>
+
 <h2>In tre gesti</h2>
 <ol>
   <li><b>Trascina i materiali</b> nella scheda Materiali: video, audio, documenti, anche tutti insieme o un'intera cartella. Vertov riconosce da solo cosa sono e come usarli.</li>
@@ -47,13 +51,13 @@ li { margin:4px 0; }
 <p>Nella tabella del Risultato premi <b>Correggi</b> su un'inquadratura e riscrivila com'è davvero: Vertov la tiene così e aggiorna le altre inquadrature della stessa scena perché restino coerenti.</p>
 
 <h2>Il report</h2>
-<p>Alla fine di ogni analisi Vertov scrive un report: materiali usati, montaggio e marker, una sinossi per ogni scena, i personaggi con il loro tempo in scena, dialoghi e sonoro, correzioni e cose da controllare. Aprilo con <b>Apri il report</b> e salvalo in PDF con il pulsante in alto, oppure esportalo in HTML insieme agli altri file.</p>
+<p>Alla fine di ogni analisi Vertov scrive un report: materiali usati, montaggio e marker, una sinossi per ogni scena, i personaggi con il loro tempo in scena, dialoghi e sonoro, correzioni e cose da controllare. Aprilo con <b>Apri il report</b> (si apre in una finestra di Vertov) e salvalo in PDF con il pulsante in alto, che apre la stampa del Mac (in basso a sinistra, <i>PDF › Salva come PDF</i>), oppure esportalo in HTML insieme agli altri file.</p>
 
 <h2>Esportare</h2>
 <p>Nella sezione <i>3 · Esporta</i> <kbd>⌘3</kbd> (o <i>File › Esporta…</i> <kbd>⌘E</kbd>) scegli cosa ti serve: foglio di calcolo (con una colonna <i>scala</i> per filtrare le inquadrature per scala del piano), marker per Avid Media Composer (verdi, per distinguerli da quelli di Murnau; in Media Composer: finestra <i>Markers</i> › menu › <i>Import Markers</i>), marker per DaVinci Resolve, report, trascrizione dei dialoghi, dati completi. Premendo <b>Esporta</b> i file vanno nella cartella indicata, con il nome della sessione (per esempio <i>Rullo 1 - descrizioni.csv</i>). Vertov ricorda le tue scelte; dopo una correzione puoi riesportare e i file vengono aggiornati.</p>
 
 <h2>File di lavoro</h2>
-<p>Per lavorare Vertov crea molti file suoi (descrizioni grezze, volti, sinossi, trascrizione, impostazioni). Non finiscono nella tua cartella: stanno nella cartella <i>file di lavoro</i> dentro quella di Vertov, una cartella per sessione con lo stesso nome (se rinomini la sessione, si rinomina anche la cartella). Li vedi con <b>Mostra</b> in Materiali o <i>File › Mostra i file di lavoro</i>. Non serve aprirli: servono a Vertov per riprendere il lavoro, correggere e riesportare.</p>
+<p>Per lavorare Vertov crea molti file suoi (descrizioni grezze, volti, sinossi, trascrizione, impostazioni). Non finiscono nella tua cartella: stanno con gli altri dati di Vertov, in <i>Libreria › Application Support › Vertov › file di lavoro</i>, una cartella per sessione con lo stesso nome (se rinomini la sessione, si rinomina anche la cartella). Li vedi con <b>Mostra</b> in Materiali o <i>File › Mostra i file di lavoro</i>. Non serve aprirli: servono a Vertov per riprendere il lavoro, correggere e riesportare.</p>
 
 <h2>Sessioni</h2>
 <p>Ogni film è una sessione: <i>Nuova</i> <kbd>⌘N</kbd>, <i>Apri…</i> <kbd>⌘O</kbd>, <i>Salva</i> <kbd>⌘S</kbd>. Eliminare una sessione non tocca mai i file originali; i file di lavoro e quelli esportati vanno nel Cestino solo se lo scegli.</p>
@@ -75,10 +79,11 @@ li { margin:4px 0; }
 <p>Per funzionare Vertov usa alcuni componenti gratuiti, installati su questo Mac:</p>
 <ul>
   <li><b>Programmi:</b> <i>ffmpeg</i>, che legge video e audio ed estrae i fotogrammi, e <i>Ollama</i>, che fa girare il modello di visione. Sono installati con Homebrew.</li>
-  <li><b>Librerie Python:</b> pywebview (la finestra), OpenCV (i volti), mlx-whisper (la trascrizione), Transformers e PyTorch (i suoni), pyaaf2 (gli AAF), pypdf (i PDF).</li>
+  <li><b>Librerie Python:</b> pywebview (la finestra di ripiego, se si apre Vertov dal Terminale), OpenCV (i volti), mlx-whisper (la trascrizione), Transformers e PyTorch (i suoni), pyaaf2 (gli AAF), pypdf (i PDF).</li>
   <li><b>Modelli di intelligenza artificiale:</b> Gemma 4 guarda le immagini e scrive descrizioni e sinossi, Whisper trascrive i dialoghi, AST riconosce i suoni, YuNet e SFace trovano e confrontano i volti.</li>
 </ul>
 <p>Una volta al giorno, all'avvio, Vertov controlla se ci sono versioni nuove di questi componenti e di Vertov stesso, e ti chiede se vuoi installarle. Puoi scegliere cosa aggiornare, rimandare o saltare una versione. Per controllare quando vuoi: <i>Vertov › Controlla aggiornamenti…</i> o il pulsante <b>Aggiornamenti…</b>. Se le librerie nuove non funzionano con Vertov, vengono rimesse da sole quelle di prima.</p>
+<p>Un aggiornamento di Vertov sostituisce tutta l'app: quella nuova si prepara accanto e, a installazione finita, Vertov si chiude e si riapre da solo. La versione di prima resta in <i>Application Support › Vertov › versioni_precedenti</i>. Il controllo all'avvio si spegne in <i>Impostazioni</i>.</p>
 <p class="nota">Vertov non usa Claude né altri servizi online: Claude è servito solo a scriverlo.</p>
 
 <h2>Libera spazio</h2>

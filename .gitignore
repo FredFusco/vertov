@@ -15,7 +15,10 @@
 !suono_fine.wav
 !caratteri/*.woff2
 !caratteri/OFL.txt
-!Vertov.app/**
+!mac/Vertov.swift
+!mac/compila.sh
+!mac/Info.plist
+!mac/vertov.icns
 # Mai, nemmeno se dentro ci fossero file ammessi:
 prova_reale/
 file di lavoro/

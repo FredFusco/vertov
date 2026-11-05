@@ -5,8 +5,9 @@
   l'app vede anche le analisi partite fuori da lei, e nessuna resta accesa per ore di nascosto.
 - Sorveglianza: un'analisi lanciata dall'app si spegne da sola se l'app non c'è più (chiusa,
   forzata, andata in crash).
-- Turni sul modello: Vertov, Murnau e Ozu usano gli stessi modelli (Gemma 4, Qwen3-VL) con contesti diversi, e
-  Ollama li ricarica (16-20 GB) ogni volta che il contesto cambia. Vertov ha la precedenza:
+- Turni sul modello: Vertov usa Gemma 4 (gemma4:26b), che usano anche Murnau e Ozu con contesti diversi
+  (Murnau usa anche Qwen3-VL, solo suo), e Ollama ricarica il modello (circa 17 GB) ogni volta che il
+  contesto cambia. Vertov ha la precedenza:
   Murnau e Ozu riconoscono un'analisi di Vertov dal programma descrivi.py e aspettano.
   Per questo ogni richiesta di Vertov usa lo stesso contesto (CONTESTO).
 - Memoria: a fine analisi Vertov toglie il modello dalla memoria, se è la copia caricata da
@@ -28,9 +29,13 @@ LAVORI = DATI / "lavori"
 OLLAMA = "http://localhost:11434"
 CONTESTO = 16384      # token di contesto chiesti a Ollama: lo stesso in ogni richiesta di Vertov
 TENUTA = "5m"         # quanto Ollama tiene il modello in memoria dopo l'ultima richiesta di Vertov
-VARIABILE_GENITORE = "VERTOV_APP"   # pid dell'app che ha lanciato l'analisi
-# Murnau e Ozu cercano proprio questo percorso ("vertov/descrivi.py") per riconoscere un'analisi di Vertov.
-PROGRAMMA = f"{Path(__file__).resolve().parent.name}/descrivi.py"
+VARIABILE_GENITORE = "VERTOV_APP_PID"   # pid del server dell'app che ha lanciato l'analisi
+# (VERTOV_APP invece è il percorso di Vertov.app, che il server usa per riaprirla dopo un aggiornamento)
+# Le analisi delle app della famiglia si riconoscono dal nome del file del programma, con o senza percorso:
+# girano da dentro le app (~/Applications/Vertov.app/Contents/Resources/programma/descrivi.py), dal codice
+# sorgente (vertov/descrivi.py) o dalla loro cartella (descrivi.py). Murnau cerca murnau.py, Ozu traduci.py,
+# e tutte e due riconoscono un'analisi di Vertov da descrivi.py.
+PROGRAMMA = "descrivi.py"
 
 
 def _processi() -> list:
@@ -51,8 +56,9 @@ def _processi() -> list:
 
 
 def _esegue(riga: str, programma: str) -> bool:
-    # Python che esegue proprio quel programma, non uno che ne nomina il percorso in un argomento.
-    return re.search(re.escape(programma) + r"(\s|$)", riga) is not None
+    """Python che esegue proprio quel programma: il nome del file come argomento a sé, con o senza percorso
+    («descrivi.py», «…/programma/descrivi.py»), non un nome che lo contiene («ridescrivi.py»)."""
+    return re.search(r"(^|\s|/)" + re.escape(programma) + r"(\s|$)", riga) is not None
 
 
 def e_vertov(pid: int) -> bool:

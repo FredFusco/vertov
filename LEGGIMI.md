@@ -9,6 +9,18 @@ Descrive ogni inquadratura di un film (immagine e sonoro) usando solo modelli lo
 
 Niente esce dal computer.
 
+## L'app
+
+Vertov è un'app del Mac: sta nella cartella Applicazioni dell'utente (`~/Applications/Vertov.app`), la trovi con Spotlight e Launchpad e la puoi tenere nel Dock. Questa cartella contiene solo il codice sorgente, da cui si costruisce e si installa l'app con `mac/compila.sh --installa`.
+
+**Vertov.app è un'app nativa per Mac** (Swift, sorgente in `mac/Vertov.swift`, si compila con `mac/compila.sh`; bastano gli strumenti da riga di comando di Xcode). Si apre subito con il logo e «Avvio di Vertov…», ha menu e scorciatoie native (con *Vertov › Impostazioni…* ⌘,), finestre di scelta dei file del Mac, la percentuale dell'analisi sull'icona nel Dock, il report e la guida in finestre proprie (dal report, *Salva come PDF / stampa* apre la stampa del Mac), la conferma dell'uscita con il logo di Vertov, ricorda posizione e misura delle finestre e riceve video, montaggi, audio, documenti e cartelle trascinati sulla finestra o sull'icona nel Dock, o aperti dal Finder con *Apri con › Vertov* (Vertov non diventa l'app predefinita per quei file). Il motore resta in Python: l'app avvia `app.py --servizio`, cioè solo il server dell'interfaccia, e lo ferma all'uscita (SIGTERM, che ferma anche un'analisi in corso, e SIGKILL dopo 5 secondi: nessun processo resta acceso); se il motore si ferma da solo, l'app propone di riavviarlo. Con la porta 8765 già occupata (un altro Vertov aperto dal Terminale) il server esce con il codice 3 e l'app lo dice; dopo un aggiornamento esce con il codice 75 e l'app si chiude e si riapre senza chiedere. `python app.py` senza `--servizio` apre ancora la finestra di pywebview, come prima: resta come ripiego e per il Terminale.
+
+**Vertov.app è completa:** dentro, in `Contents/Resources/programma`, c'è tutto il programma (i file che `.gitignore` ammette, tranne `mac/`); fuori restano solo l'ambiente Python (`~/.venvs/descrittore`, condiviso con Murnau), i dati (`~/Library/Application Support/Vertov`, con sessioni, file di lavoro e preferenze), le cache dei modelli e Ollama. `mac/compila.sh` la costruisce in `~/Library/Caches/Vertov/` (fuori da Drive, perché Spotlight non la trovi due volte) e con `--installa` la mette in `~/Applications`, scambiandola con quella che c'è. Il motore gira con `PYTHONDONTWRITEBYTECODE=1`, così non scrive file dentro l'app e la firma resta valida (`codesign --verify --deep --strict`). Al primo avvio su un Mac nuovo Vertov prepara da sé l'ambiente Python (PyTorch, Transformers, OpenCV, mlx-whisper, pyaaf2, pypdf, pywebview): ci vuole qualche minuto.
+
+L'app e il motore scrivono nello stesso registro, `~/.cache/descrittore/vertov.log` (*Aiuto › Apri il registro di Vertov*).
+
+Chiudendo Vertov compare un riquadro di conferma con **Non mostrare più**: spuntato, le volte successive l'app si chiude subito, tranne quando un'analisi è in corso. *Vertov › Impostazioni…* (⌘,) lo riattiva.
+
 ## Uso consigliato (in due passaggi)
 
 **1. Volti.** Riconosce le persone e prepara la pagina di controllo (pochi minuti):
@@ -58,7 +70,7 @@ Se interrompi l'elaborazione, rilanciando lo stesso comando riparte da dove si e
 
 ## Risultati (nella cartella `--out`)
 
-Dall'app, `--out` è la cartella di lavoro della sessione (`file di lavoro/<sessione>` dentro la cartella di Vertov, esclusa da `.gitignore` e quindi mai pubblicata): l'utente non la vede. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Avid.txt`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app sposta nella cartella di lavoro i file che le versioni precedenti lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
+Dall'app, `--out` è la cartella di lavoro della sessione (`~/Library/Application Support/Vertov/file di lavoro/<sessione>`, mai dentro Vertov.app né nella cartella del codice, quindi mai pubblicata e mai toccata da un aggiornamento): l'utente non la vede, se non con *File › Mostra i file di lavoro*. Nella cartella di destinazione finiscono solo i file che sceglie in *Esporta*, chiamati `<sessione> - descrizioni.csv`, `<sessione> - marker Avid.txt`, `<sessione> - marker Resolve.edl`, `<sessione> - report.html`, `<sessione> - dialoghi.srt`, `<sessione> - dati.jsonl`. All'avvio l'app porta nella cartella dei file di lavoro le cartelle create dalle versioni precedenti (fino alla 1.0.9 stavano nella cartella del codice, in `file di lavoro/`; mai quella di un'analisi in corso) e sposta nella cartella di lavoro i file che le versioni ancora più vecchie lasciavano nella cartella dei risultati (non quelli di Murnau, che può usare la stessa cartella).
 
 A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi `progresso.py`); l'app le mostra nel riquadro dell'esito insieme all'eventuale errore.
 
@@ -93,17 +105,19 @@ Tutte le richieste al modello di visione (descrizioni, nomi dei volti, sinossi d
 
 Vertov usa Gemma 4, come Ozu e come Murnau per le verifiche, con impostazioni diverse: se lavorano insieme, Ollama deve ricaricarlo (16 GB) a ogni cambio. Le regole stanno in `coordinamento.py`:
 
-- **Precedenza a Vertov**: Murnau e Ozu riconoscono un'analisi di Vertov dal programma `vertov/descrivi.py` eseguito da Python, e aspettano. Non rinominare la cartella `vertov` né spostare `descrivi.py` senza aggiornare anche loro (`ALTRI_PROGRAMMI` in murnau/coordinamento.py, `PROGRAMMI_DI_ANALISI` in ozu/motore_locale.py).
+- **Precedenza a Vertov**: Murnau e Ozu riconoscono un'analisi di Vertov dal nome del programma, `descrivi.py`, eseguito da Python con o senza percorso (da Vertov.app, dal codice sorgente o dalla sua cartella), e aspettano; Ozu chiede anche al server di Vertov se un'analisi è in corso. Non rinominare `descrivi.py` senza aggiornare anche loro (`ALTRI_PROGRAMMI` in murnau/coordinamento.py, `PROGRAMMI_DI_ANALISI` in ozu/motore_locale.py). Allo stesso modo, Vertov riconosce le proprie analisi da `descrivi.py` (`coordinamento._esegue`), e le app sorelle da `murnau.py` e `traduci.py`.
 - **Un solo contesto**: ogni richiesta di Vertov (descrizioni, volti, report) usa lo stesso contesto (`CONTESTO`, 16384), così Vertov non costringe Ollama a ricaricare il modello nemmeno da solo.
 - **Una sola analisi di Vertov alla volta**; il modello resta in memoria 5 minuti (`TENUTA`) e a fine analisi viene tolto se è la copia di Vertov.
-- **Chiusura vera**: Ferma (e la chiusura della finestra) manda SIGTERM a tutta l'analisi e, dopo 5 secondi, SIGKILL. Un'analisi lanciata dall'app controlla ogni secondo che l'app esista ancora (`VERTOV_APP`) e altrimenti si spegne.
+- **Chiusura vera**: Ferma (e la chiusura della finestra) manda SIGTERM a tutta l'analisi e, dopo 5 secondi, SIGKILL. Un'analisi lanciata dall'app controlla ogni secondo che il server che l'ha lanciata esista ancora (`VERTOV_APP_PID`; `VERTOV_APP` invece è il percorso di Vertov.app, da riaprire dopo un aggiornamento) e altrimenti si spegne.
 - **Registro**: ogni analisi scrive `~/Library/Application Support/Vertov/lavori/<pid>.json`; l'app mostra quelle partite da Terminale con un pulsante Ferma.
 
 ## Aggiornamenti e spazio
 
-- `aggiornamenti.py` controlla Vertov (annuncio all'indirizzo in `aggiornamenti.json`), ffmpeg e Ollama (Homebrew), le librerie Python dell'ambiente e i modelli (Ollama, Hugging Face). L'app chiede prima di installare; le librerie tornano alla versione precedente se non si caricano più.
+- `aggiornamenti.py` controlla Vertov (annuncio all'indirizzo in `aggiornamenti.json`), ffmpeg e Ollama (Homebrew), le librerie Python dell'ambiente e i modelli (Ollama, Hugging Face). L'app chiede prima di installare; le librerie tornano alla versione precedente se non si caricano più. Il controllo all'avvio si spegne con **Controlla all'avvio** o in *Impostazioni*.
+- Un aggiornamento di Vertov scarica Vertov.app nuova completa (controllata con SHA-256), la prepara accanto a quella installata e le scambia con `os.replace`: il Vertov aperto continua a girare fino al riavvio, che avviene da solo, e i file di un'app in uso non vengono mai riscritti. La versione di prima va in `~/Library/Application Support/Vertov/versioni_precedenti/`, per poter tornare indietro. Dal codice sorgente gli aggiornamenti di Vertov non si installano: lì si usano git e `mac/compila.sh --installa`.
 - Durante il lavoro Hugging Face resta fuori linea (`HF_HUB_OFFLINE`, impostato in `audio.py` quando Whisper e AST sono già sul Mac): solo Aggiornamenti… lo contatta, e senza statistiche d'uso.
 - Vertov è pubblicato su GitHub (https://github.com/FredFusco/vertov): ogni versione è una release, e `aggiornamenti.json` punta a `releases/latest/download/vertov.json`.
-- Per pubblicare una versione nuova: `git commit` e `git push`, poi `python prepara_aggiornamento.py 1.1.0 "Novità…" --pubblica`.
+- Per pubblicare una versione nuova: `git commit` e `git push`, poi `python prepara_aggiornamento.py 1.1.0 "Novità…" --pubblica`. Scrive VERSIONE, costruisce Vertov.app con `mac/compila.sh`, crea in `dist/` il pacchetto (lo zip con dentro l'app completa) e l'annuncio e li carica come release. Per avere la versione nuova anche su questo Mac: `mac/compila.sh --installa`.
 - Su GitHub finiscono solo i file del programma ammessi da `.gitignore`: mai film, audio, documenti o risultati.
-- `pulizia.py` misura e cancella fotogrammi temporanei, registri, cache di pip e modelli non usati (File › Libera spazio…).
+- `pulizia.py` misura e cancella fotogrammi temporanei, registri, cache di pip e modelli non usati (File › Libera spazio…). Non propone mai i modelli di Ollama delle app sorelle: li legge dalle costanti (`MODELLO = "…"`, `REVISORE = "…"`) del loro codice sorgente in `My Drive/CLAUDE` e del programma dentro le app installate in `~/Applications`.
+- I test stanno in `tests/`: `~/.venvs/descrittore/bin/python -m unittest discover -s tests -v` (scelte dei file dall'app, `--servizio`, scambio dell'app durante un aggiornamento, riconoscimento delle analisi, modelli protetti).

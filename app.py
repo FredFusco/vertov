@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Vertov: l'app del descrittore di inquadrature.
 
-Apre una finestra propria (pywebview, WebKit di macOS) con l'interfaccia, servita
-da un piccolo server interno raggiungibile solo da questo computer. L'interfaccia
-fa scegliere i file, lancia il riconoscimento dei volti e le descrizioni
+L'interfaccia è servita da un piccolo server interno raggiungibile solo da questo
+computer. Fa scegliere i file, lancia il riconoscimento dei volti e le descrizioni
 (descrivi.py), mostra l'avanzamento e i risultati e permette di correggerli.
 Ogni lavoro è una sessione salvata, che si può riaprire in seguito.
 
-    ~/.venvs/descrittore/bin/python app.py
+Di solito la finestra è Vertov.app, l'app nativa per Mac (mac/Vertov.swift): avvia questo
+programma con --servizio, cioè solo il server, e fa da sé finestra, menu, finestre di
+scelta dei file, trascinamento e conferma dell'uscita. Senza --servizio app.py apre
+una finestra propria (pywebview), come prima: resta come ripiego e per il Terminale.
+
+    ~/.venvs/descrittore/bin/python app.py              # con la finestra di pywebview
+    ~/.venvs/descrittore/bin/python app.py --servizio   # solo il server, per Vertov.app
 """
 
 import json
@@ -37,10 +42,19 @@ DATI = Path.home() / "Library" / "Application Support" / "Vertov"
 SESSIONI = DATI / "sessioni"
 FILE_CORRENTE = DATI / "sessione_corrente.json"
 MODELLO = modulo_modello.MODELLO  # il modello di visione: si sceglie in modello.py
-# I file con cui Vertov lavora (descrizioni grezze, volti, sinossi, trascrizione...) stanno dentro la
-# cartella di Vertov, una cartella per sessione (mai pubblicata: vedi .gitignore). Nella cartella di
-# destinazione scelta dall'utente finisce solo ciò che esporta.
-FILE_DI_LAVORO = CARTELLA / "file di lavoro"
+# I file con cui Vertov lavora (descrizioni grezze, volti, sinossi, trascrizione...) stanno qui, con gli altri
+# dati di Vertov, una cartella per sessione. Nella cartella di destinazione scelta dall'utente finisce solo
+# ciò che esporta. Non stanno nella cartella del programma: dentro Vertov.app non si scrive mai (la firma
+# dell'app resterebbe rotta), e l'app funziona anche su un Mac senza la cartella del codice.
+FILE_DI_LAVORO = DATI / "file di lavoro"
+# Il registro, in comune con Vertov.app: tutti e due ci scrivono in aggiunta.
+REGISTRO = Path.home() / ".cache" / "descrittore" / "vertov.log"
+# Scelte dell'interfaccia, in comune con Vertov.app (per esempio «chiudi senza chiedere»).
+PREFERENZE = DATI / "preferenze.json"
+# Con --servizio: Vertov.app riconosce questi codici di uscita del server (vedi mac/Vertov.swift).
+CODICE_RIAVVIO = 75  # dopo un aggiornamento: l'app si chiude senza chiedere e si riapre da sola
+CODICE_PORTA_OCCUPATA = 3  # un altro Vertov ha già il server aperto
+SERVIZIO = False  # True con --servizio: niente finestra di pywebview, la fa Vertov.app
 
 CAMPI_FILE = ["video", "edl", "sceneggiatura", "dialoghi", "odg", "audio_dialoghi",
               "audio_sfx", "audio_musica", "audio_mix", "out"]
@@ -152,8 +166,9 @@ def materiali_di(p: dict) -> set:
 
 def riporta_cartella_lavoro(p: dict) -> bool:
     """Riporta in FILE_DI_LAVORO la cartella di lavoro della sessione se sta altrove: creata da una
-    versione precedente (in My Drive/CLAUDE) o rimasta con il percorso di prima dopo che la cartella
-    di Vertov ha cambiato nome. Restituisce True se la sessione è cambiata."""
+    versione precedente (in My Drive/CLAUDE o, fino alla 1.0.9, nella cartella del programma) o rimasta
+    con il percorso di prima dopo che la cartella di Vertov ha cambiato nome. Restituisce True se la
+    sessione è cambiata."""
     if not p.get("cartella_lavoro"):
         return False
     vecchia = Path(p["cartella_lavoro"])
@@ -198,9 +213,13 @@ def trasloca(p: dict) -> list:
 
 
 def trasloca_tutte() -> None:
+    # Mai spostare la cartella di un'analisi in corso (per esempio lanciata da Terminale): ci sta scrivendo.
+    in_uso = {str(Path(a["out"]).resolve()) for a in coordinamento.analisi_in_corso() if a.get("out")}
     for f in SESSIONI.glob("*.json"):
         try:
             p = json.loads(f.read_text())
+            if p.get("cartella_lavoro") and str(Path(p["cartella_lavoro"]).resolve()) in in_uso:
+                continue
             spostati = trasloca(p)
             if spostati:
                 print(f"Sessione {p.get('nome')}: spostati nella cartella di lavoro {', '.join(spostati)}")
@@ -517,8 +536,8 @@ class Lavoro:
         return {"percento": min(99, int(100 * trascorso / (trascorso + restano))) if trascorso + restano else 0,
                 "restano": restano}
 
-    def ferma(self) -> None:
-        """Ferma l'analisi e tutto ciò che ha avviato; se entro 5 secondi non è uscita, la chiude d'ufficio."""
+    def ferma(self, attesa: float = 5) -> None:
+        """Ferma l'analisi e tutto ciò che ha avviato; se entro `attesa` secondi non è uscita, la chiude d'ufficio."""
         if not self.attivo():
             return
         processo = self.processo
@@ -528,7 +547,7 @@ class Lavoro:
         except ProcessLookupError:
             return
         try:
-            processo.wait(timeout=5)
+            processo.wait(timeout=attesa)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(processo.pid, signal.SIGKILL)
@@ -635,11 +654,34 @@ def prerequisiti() -> dict:
     return stato
 
 
+def leggi_preferenze() -> dict:
+    try:
+        return json.loads(PREFERENZE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def scrivi_preferenza(chiave: str, valore) -> None:
+    PREFERENZE.parent.mkdir(parents=True, exist_ok=True)
+    temporaneo = PREFERENZE.with_suffix(".tmp")
+    temporaneo.write_text(json.dumps({**leggi_preferenze(), chiave: valore}, ensure_ascii=False, indent=1))
+    temporaneo.replace(PREFERENZE)
+
+
 FINESTRA = None  # la finestra dell'app, per le finestre di scelta dei file
 
 
-def scegli(tipo: str, messaggio: str):
-    """Finestra di scelta nativa; restituisce il percorso o None se annullata."""
+def scegli(tipo: str, messaggio: str, dati: dict = None):
+    """Finestra di scelta nativa: una lista di percorsi (tipo "file"), un percorso (tipo "cartella") o None se
+    annullata. Con Vertov.app la finestra la apre l'app, che manda i percorsi scelti nella richiesta
+    («percorsi», vuoto se annullata); altrimenti la apre pywebview, come prima."""
+    if dati is not None and "percorsi" in dati:
+        scelti = [str(x).rstrip("/") for x in dati["percorsi"] if x]
+        if not scelti:
+            return None
+        return scelti if tipo == "file" else scelti[0]
+    if SERVIZIO:
+        raise RuntimeError("La finestra di scelta la apre Vertov.app: aggiorna l'interfaccia e riprova.")
     import webview
     finestra_dialogo = getattr(webview, "FileDialog", None)
     if finestra_dialogo:
@@ -878,6 +920,9 @@ class Gestore(BaseHTTPRequestHandler):
                         "automatico": aggiornamenti.leggi_stato().get("automatico", True)})
         elif url.path == "/api/pulizia":
             self._json({"voci": pulizia.voci(MODELLO)})
+        elif url.path == "/api/preferenze":
+            self._json({"chiudi_senza_chiedere": bool(leggi_preferenze().get("chiudi_senza_chiedere")),
+                        "automatico": aggiornamenti.leggi_stato().get("automatico", True)})
         elif url.path == "/api/volti":
             self._json(leggi_gruppi(_lavoro(progetto)))
         elif url.path == "/api/risultati":
@@ -925,10 +970,10 @@ class Gestore(BaseHTTPRequestHandler):
         progetto = carica_progetto()
         try:
             if url.path == "/api/scegli":
-                self._json({"percorso": scegli(dati.get("tipo", "cartella"), dati.get("messaggio", "Scegli"))})
+                self._json({"percorso": scegli(dati.get("tipo", "cartella"), dati.get("messaggio", "Scegli"), dati)})
             elif url.path == "/api/sfoglia":
                 # Finestra di scelta: i file scelti vengono riconosciuti come quelli trascinati.
-                scelti = scegli(dati.get("tipo", "file"), "Materiali")
+                scelti = scegli(dati.get("tipo", "file"), "Materiali", dati)
                 if not scelti:
                     self._json({"esiti": []})
                     return
@@ -1012,7 +1057,8 @@ class Gestore(BaseHTTPRequestHandler):
             elif url.path == "/api/report":
                 if not (_lavoro(progetto) / "report_vertov.html").exists():
                     raise RuntimeError("Il report non c'è ancora: viene creato alla fine dell'analisi.")
-                apri_report()
+                if not SERVIZIO:  # con Vertov.app la finestra del report la apre l'app
+                    apri_report()
                 self._json({"ok": True})
             elif url.path == "/api/esporta":
                 if dati.get("cartella"):
@@ -1024,6 +1070,11 @@ class Gestore(BaseHTTPRequestHandler):
                 self._json({"ok": True, "creati": creati, "cartella": progetto["out"]})
             elif url.path == "/api/esito-visto":
                 LAVORO.esito = None
+                self._json({"ok": True})
+            elif url.path == "/api/preferenze":
+                # Le stesse preferenze che legge Vertov.app (la conferma alla chiusura è sua).
+                if "chiudi_senza_chiedere" in dati:
+                    scrivi_preferenza("chiudi_senza_chiedere", bool(dati["chiudi_senza_chiedere"]))
                 self._json({"ok": True})
             elif url.path == "/api/aggiornamenti":
                 azione = dati.get("azione")
@@ -1047,7 +1098,11 @@ class Gestore(BaseHTTPRequestHandler):
                 elif azione == "riavvia":
                     self._json({"ok": True})
                     aggiornamenti.riavvia(PORTA)
-                    threading.Timer(0.3, FINESTRA.destroy).start()
+                    if SERVIZIO:
+                        # Vertov.app vede il codice 75 e si chiude senza chiedere; riavvia() la riapre.
+                        threading.Timer(0.3, lambda: (LAVORO.ferma(), os._exit(CODICE_RIAVVIO))).start()
+                    else:
+                        threading.Timer(0.3, FINESTRA.destroy).start()
                 else:
                     self.send_error(404)
             elif url.path == "/api/pulizia":
@@ -1132,8 +1187,7 @@ def apri_aiuto():
 
 
 def apri_registro():
-    log = Path.home() / ".cache" / "descrittore" / "vertov.log"
-    subprocess.run(["open", "-a", "Console", str(log)] if log.exists() else ["open", str(log.parent)])
+    subprocess.run(["open", "-a", "Console", str(REGISTRO)] if REGISTRO.exists() else ["open", str(REGISTRO.parent)])
 
 
 def crea_menu() -> list:
@@ -1153,6 +1207,7 @@ def crea_menu() -> list:
             MenuAction("Mostra i file di lavoro", _js("lavoro")),
             MenuSeparator(),
             MenuAction("Libera spazio…", _js("pulizia")),
+            MenuAction("Impostazioni…", _js("impostazioni")),
         ]),
         Menu("Vista", [
             MenuAction("Materiali", _js("vista-materiali")),
@@ -1181,8 +1236,10 @@ SCORCIATOIE = {
     "Nuova sessione": ("n", False), "Apri sessione…": ("o", False), "Salva sessione": ("s", False),
     "Aggiungi materiali…": ("o", True), "Esporta…": ("e", False), "Materiali": ("1", False),
     "Risultato": ("2", False), "Esporta": ("3", False), "Controlla i volti…": ("v", True), "Descrivi il film": ("r", False),
-    "Ferma": (".", False), "Guida di Vertov": ("?", False),
+    "Ferma": (".", False), "Guida di Vertov": ("?", False), "Impostazioni…": (",", False),
 }
+# Voci che su macOS stanno nel menu dell'app, sotto «Informazioni su».
+NEL_MENU_APP = ["Impostazioni…", "Controlla aggiornamenti…"]
 
 
 def sistema_menu() -> None:
@@ -1225,13 +1282,16 @@ def sistema_menu() -> None:
                             barra.numberOfItems())
         barra.insertItem_atIndex_(voce, indice_aiuto)
         app.setWindowsMenu_(menu)
-    # «Controlla aggiornamenti…» va nel menu Vertov, sotto «Informazioni su», come nelle altre app.
-    for i in range(barra.numberOfItems()):
-        sotto = barra.itemAtIndex_(i).submenu()
-        voce = sotto.itemWithTitle_("Controlla aggiornamenti…") if sotto is not None and i > 0 else None
-        if voce is not None and barra.itemAtIndex_(0).submenu() is not None:
-            sotto.removeItem_(voce)
-            barra.itemAtIndex_(0).submenu().insertItem_atIndex_(voce, 1)
+    # Impostazioni e «Controlla aggiornamenti…» vanno nel menu Vertov, sotto «Informazioni su», come nelle altre app.
+    menu_app = barra.itemAtIndex_(0).submenu()
+    for posizione, titolo in enumerate(NEL_MENU_APP, 1):
+        for i in range(1, barra.numberOfItems()):
+            sotto = barra.itemAtIndex_(i).submenu()
+            voce = sotto.itemWithTitle_(titolo) if sotto is not None else None
+            if voce is not None and menu_app is not None:
+                sotto.removeItem_(voce)
+                menu_app.insertItem_atIndex_(voce, posizione)
+                break
     for i in range(barra.numberOfItems()):
         sotto = barra.itemAtIndex_(i).submenu()
         if sotto is None:
@@ -1249,8 +1309,33 @@ def sistema_menu() -> None:
                 visti.add(titolo)
 
 
+def servizio() -> None:
+    """Solo il server dell'interfaccia, per Vertov.app: niente pywebview. Si ferma quando Vertov.app lo chiude
+    (SIGTERM), fermando prima un'eventuale elaborazione (si potrà riprendere)."""
+    global SERVIZIO
+    SERVIZIO = True
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", PORTA), Gestore)
+    except OSError:
+        print("La porta di Vertov è già occupata: c'è un altro Vertov aperto.", flush=True)
+        sys.exit(CODICE_PORTA_OCCUPATA)
+
+    def fine(*_):
+        # Entro i 5 secondi che Vertov.app concede prima di chiudere il server d'ufficio.
+        LAVORO.ferma(attesa=3.5)
+        os._exit(0)
+
+    signal.signal(signal.SIGTERM, fine)
+    signal.signal(signal.SIGINT, fine)
+    trasloca_tutte()  # le cartelle di lavoro delle versioni precedenti, nella cartella dei file di lavoro
+    print(f"Server di Vertov pronto su 127.0.0.1:{PORTA} (versione {aggiornamenti.versione()})", flush=True)
+    server.serve_forever()
+
+
 def main():
     global FINESTRA
+    if "--servizio" in sys.argv[1:]:
+        return servizio()
     import webview
     try:
         server = ThreadingHTTPServer(("127.0.0.1", PORTA), Gestore)
@@ -1260,12 +1345,13 @@ def main():
                         '(first process whose name is "Vertov" or name is "Python") to true'],
                        capture_output=True)
         return
-    trasloca_tutte()  # i file di lavoro lasciati dalle versioni precedenti nelle cartelle dei risultati
+    trasloca_tutte()  # le cartelle di lavoro delle versioni precedenti, nella cartella dei file di lavoro
     threading.Thread(target=server.serve_forever, daemon=True).start()
     identita_mac()
     FINESTRA = webview.create_window(
         "Vertov", f"http://127.0.0.1:{PORTA}", width=1180, height=880, min_size=(720, 560),
-        background_color="#f4ede0", confirm_close=True, text_select=True)
+        background_color="#f4ede0", confirm_close=not leggi_preferenze().get("chiudi_senza_chiedere"),
+        text_select=True)
     # Chiudendo la finestra si ferma un'eventuale elaborazione: si potrà riprendere.
     FINESTRA.events.closed += LAVORO.ferma
     def all_avvio():
