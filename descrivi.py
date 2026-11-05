@@ -402,7 +402,10 @@ def allinea_copione(inquadrature: list, scene: list) -> None:
 
     Si cercano nella scena dell'inquadratura e in quelle adiacenti, anche
     unendo due frasi consecutive (la trascrizione spezza le battute in modo
-    diverso dal copione).
+    diverso dal copione). Una battuta trascritta breve che sta quasi parola per
+    parola dentro una frase più lunga del copione conta come trovata: la
+    trascrizione spesso ne coglie solo un pezzo, e il PDF a volte attacca alla
+    battuta il testo che segue.
     """
     from difflib import SequenceMatcher
     cache = {}
@@ -421,9 +424,15 @@ def allinea_copione(inquadrature: list, scene: list) -> None:
                 candidati += cache[i]
         for _, _, testo in q.dialoghi:
             n = _normalizza(testo)
+            parole = n.split()
             migliore, punteggio = None, 0.0
             for chi, frase in candidati:
-                r = SequenceMatcher(None, n, _normalizza(frase)).ratio()
+                f = _normalizza(frase)
+                r = SequenceMatcher(None, n, f).ratio()
+                if len(parole) >= 3:
+                    # Quanta parte della battuta trascritta si ritrova, nello stesso ordine, nella frase del copione.
+                    blocchi = SequenceMatcher(None, parole, f.split(), autojunk=False).get_matching_blocks()
+                    r = max(r, 0.75 * sum(b.size for b in blocchi) / len(parole))
                 if r > punteggio:
                     migliore, punteggio = (chi, frase), r
             q.copione.append(migliore if punteggio >= 0.6 else None)
