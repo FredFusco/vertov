@@ -63,6 +63,7 @@ Dall'app, `--out` è la cartella di lavoro della sessione (`file di lavoro/<sess
 A fine lavoro l'analisi segnala le cose da verificare con righe `@@avviso` (vedi `progresso.py`); l'app le mostra nel riquadro dell'esito insieme all'eventuale errore.
 
 - `inquadrature.csv`: si apre in Excel. Una riga per inquadratura con piano, movimento di macchina, personaggi, azione, ambiente, luce, dialoghi, battute del copione, sonoro, suoni rilevati e descrizione
+- colonna `scala` del CSV: la scala del piano da un elenco fisso (`SCALE` in `descrivi.py`), per filtrare e ordinare; `piano` resta il testo libero con angolazioni e over the shoulder
 - `inquadrature.jsonl`: gli stessi dati in formato completo, compresi volti riconosciuti e livelli audio
 - `marker_resolve.edl`: in DaVinci Resolve, *Timeline > Import > Timeline Markers from EDL* mette ogni descrizione come marker sulla timeline
 - `marker_avid.txt`: in Avid Media Composer, finestra *Markers* › menu › *Import Markers* (formato di testo con tabulazioni, come Murnau; marker verdi sulla traccia V1)

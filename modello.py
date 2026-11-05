@@ -89,7 +89,10 @@ def _conforma(dati, schema: dict) -> dict:
                 v = v.get("testo") or json.dumps(v, ensure_ascii=False)
             v = "" if v is None else str(v).strip()
             if "enum" in tipo and v not in tipo["enum"]:
-                v = tipo["enum"][-1]  # il valore più prudente (es. sicurezza "bassa")
+                # "Primo piano" o "primo piano stretto" valgono "primo piano"; se non c'è nessuna voce
+                # dell'elenco, l'ultima, la più prudente (sicurezza "bassa", scala "non determinabile").
+                trovate = [e for e in tipo["enum"] if e.lower() in v.lower()]
+                v = max(trovate, key=len) if trovate else tipo["enum"][-1]
         risultato[campo] = v
     # Un campo richiesto e vuoto va bene (es. nessun dialogo), un campo richiesto assente no:
     # vuol dire che il modello ha risposto ad altro.

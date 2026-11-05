@@ -169,6 +169,15 @@ def libera_modello(modello: str) -> None:
         pass  # Ollama spento o modello già scarico
 
 
+def a_batteria() -> bool:
+    """True se il Mac va a batteria: il processore grafico rallenta a circa metà velocità."""
+    try:
+        return "Battery Power" in subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True,
+                                                 timeout=5).stdout.splitlines()[0]
+    except Exception:
+        return False
+
+
 def notifica(testo: str) -> None:
     """Notifica di macOS: un'analisi lanciata da Terminale non passa inosservata."""
     try:

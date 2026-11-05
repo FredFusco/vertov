@@ -1152,7 +1152,9 @@ async function aggiorna(subito) {
   if (!personaggiCaricati) { $("#personaggi").value = s.personaggi || ""; personaggiCaricati = true; }
   const p = s.prerequisiti;
   const pr = $("#prerequisiti"); pr.replaceChildren();
-  for (const [ok, t] of [[p.ollama, p.ollama ? "Ollama attivo" : "Ollama non attivo"], [p.modello, p.modello ? "Modello di visione pronto" : "Modello di visione mancante"]]) {
+  const voci = [[p.ollama, p.ollama ? "Ollama attivo" : "Ollama non attivo"], [p.modello, p.modello ? "Modello di visione pronto" : "Modello di visione mancante"]];
+  if (p.batteria) voci.push([false, "A batteria: l'analisi va a circa metà velocità"]);
+  for (const [ok, t] of voci) {
     const sp = crea("span"); sp.append(crea("span", "pallino" + (ok ? " ok" : "")), t); pr.appendChild(sp);
   }
   const l = s.lavoro;

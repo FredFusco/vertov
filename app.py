@@ -624,7 +624,7 @@ def ricordato(chiave: str, secondi: float, calcola):
 
 
 def prerequisiti() -> dict:
-    stato = {"ollama": False, "modello": False}
+    stato = {"ollama": False, "modello": False, "batteria": coordinamento.a_batteria()}
     try:
         with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2) as r:
             modelli = [m["name"] for m in json.load(r).get("models", [])]

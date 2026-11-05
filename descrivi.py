@@ -557,10 +557,15 @@ def estrai_fotogrammi_volti(video: Path, q: Inquadratura, cartella: Path, ritagl
     return esistenti
 
 
+# La scala del piano da un elenco fisso: nel foglio di calcolo si può filtrare e ordinare.
+SCALE = ["campo lunghissimo", "campo lungo", "campo medio", "figura intera", "piano americano", "mezza figura",
+         "primo piano", "primissimo piano", "dettaglio", "non determinabile"]
+
 SCHEMA = {
     "type": "object",
     "properties": {
         "piano": {"type": "string"},
+        "scala": {"type": "string", "enum": SCALE},
         "movimento_macchina": {"type": "string"},
         "personaggi": {"type": "array", "items": {"type": "string"}},
         "azione": {"type": "string"},
@@ -570,7 +575,7 @@ SCHEMA = {
         "dialoghi_riassunto": {"type": "string"},
         "descrizione": {"type": "string"},
     },
-    "required": ["piano", "movimento_macchina", "personaggi", "azione",
+    "required": ["piano", "scala", "movimento_macchina", "personaggi", "azione",
                  "ambiente", "luce_atmosfera", "sonoro", "dialoghi_riassunto", "descrizione"],
 }
 
@@ -582,6 +587,9 @@ Campi richiesti:
 - piano: scala del piano (es. campo lunghissimo, campo lungo, figura intera, piano americano, \
 mezza figura, primo piano, primissimo piano, dettaglio, inserto) ed eventuale angolazione \
 (dal basso, dall'alto, soggettiva, over the shoulder).
+- scala: la scala del piano principale, scelta SOLO da questo elenco: campo lunghissimo, campo lungo, \
+campo medio, figura intera, piano americano, mezza figura, primo piano, primissimo piano, dettaglio, \
+non determinabile. Se la scala cambia durante l'inquadratura, scegli quella che dura di più.
 - movimento_macchina: fissa, panoramica, carrello, dolly, zoom, macchina a mano, steadicam... \
 deducilo confrontando i fotogrammi: se lo sfondo o il punto di vista cambiano mentre i soggetti \
 restano inquadrati, la macchina si muove; un'immagine leggermente instabile indica macchina a \
@@ -607,7 +615,8 @@ notizie, richieste, promesse). Non fermarti alla prima battuta e non ridurre uno
 gesto: se ci sono più scambi riassumili tutti, anche in tre o quattro frasi se servono (es. \
 "Teresa chiede a Paolo se ha già parlato con il padre; Paolo ammette di non averne il coraggio \
 e le chiede di non dirlo a nessuno; lei promette di tacere"). RIASSUMI: non citare le battute \
-tra virgolette, non scrivere "nel copione" e non riportare tra parentesi il testo del copione. \
+tra virgolette, non scrivere "nel copione" e non riportare tra parentesi il testo del copione; vale \
+anche per una sola battuta breve (es. "Teresa acconsente", non "Teresa dice: «Sì, sì»"). \
 Chi dice cosa: usa il personaggio indicato nel copione per ogni battuta ("nel copione TERESA: \
 ..."); per le battute senza corrispondenza nel copione non attribuirle a un personaggio preciso \
 se non è evidente. La trascrizione automatica può contenere errori: una battuta senza senso e \
@@ -719,23 +728,36 @@ def costruisci_prompt(q: Inquadratura, vicini: list, max_scena: int, sonoro: str
 _D_EUFONICA = re.compile(r"\b([EeOoAa])d (?=[^\W\daeiouàèéìòùAEIOUÀÈÉÌÒÙhH])")
 
 
+_CITAZIONE = re.compile(r"[«\"“]\s*([^»\"”]{1,120}?)\s*[»\"”]|(?<=\s)'([^']{1,60})'(?=[\s.,;:]|$)")
+
+
 def ritocca(testo: str) -> str:
     """Piccoli errori ricorrenti del modello: "ed", "od", "ad" davanti a consonante ("Teresa ed Paolo")."""
     return _D_EUFONICA.sub(r"\1 ", testo)
+
+
+def senza_citazioni(testo: str) -> str:
+    """Il riassunto dei dialoghi senza virgolette: il modello cita ancora le battute brevi («Sì, sì, sì»)
+    anche quando gli si chiede di riassumere. Gli apostrofi (l'amica) restano."""
+    def togli(m):
+        return (m.group(1) or m.group(2)).strip()
+    return re.sub(r":\s+(?=\w)", " ", _CITAZIONE.sub(togli, testo)) if _CITAZIONE.search(testo) else testo
 
 
 def chiedi_al_modello(modello: str, prompt: str, immagini: list) -> dict:
     """Descrizione di un'inquadratura (solleva modulo_modello.ErroreModello se non arriva)."""
     desc = modulo_modello.chiedi(prompt, [base64.b64encode(p.read_bytes()).decode() for p in immagini],
                                  SCHEMA, modello, temperatura=0.2, repeat_penalty=1.15)
-    return {k: ritocca(v) if isinstance(v, str) else v for k, v in desc.items()}
+    desc = {k: ritocca(v) if isinstance(v, str) else v for k, v in desc.items()}
+    desc["dialoghi_riassunto"] = senza_citazioni(desc.get("dialoghi_riassunto", ""))
+    return desc
 
 
 # --------------------------------------------------------------------------
 # Uscite
 # --------------------------------------------------------------------------
 
-CAMPI_CSV = ["numero", "numero_scena", "tc_in", "tc_out", "durata_s", "clip", "scena", "piano",
+CAMPI_CSV = ["numero", "numero_scena", "tc_in", "tc_out", "durata_s", "clip", "scena", "scala", "piano",
              "movimento_macchina", "personaggi", "azione", "ambiente",
              "luce_atmosfera", "dialoghi", "battute_copione", "dialoghi_riassunto", "sonoro",
              "sfx_rilevati", "musica_rilevata", "descrizione", "ciak", "ripresa", "effetti",
@@ -1185,6 +1207,10 @@ def main() -> None:
     coordinamento.sorveglia_app()
     if registro.dati["origine"] == "terminale":
         coordinamento.notifica(f"Analisi avviata da Terminale: {args.video.name}. La vedi e la puoi fermare dall'app.")
+    if coordinamento.a_batteria():
+        print("Il Mac va a batteria: il processore grafico lavora a circa metà velocità. Collegalo alla corrente.")
+        progresso.avviso("L'analisi è partita con il Mac a batteria, quando il processore grafico va a circa metà "
+                         "velocità: per le analisi lunghe conviene collegarlo alla corrente.")
     rifai = {int(n) for n in re.split(r"[,\s]+", args.rifai) if n} if args.rifai else set()
 
     fps, durata, tc_inizio_s, inquadrature = carica_inquadrature(args)
