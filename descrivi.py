@@ -596,9 +596,11 @@ ordini del giorno o nelle inquadrature vicine.
 - azione: cosa succede nell'inquadratura, dall'inizio alla fine.
 - ambiente: luogo, interno/esterno, giorno/notte.
 - luce_atmosfera: luce, colori, tono.
-- sonoro: cosa si sente (dialoghi, effetti, ambiente, musica e suo carattere), basandoti \
-sull'analisi del sonoro e sulle battute se presenti; se non hai informazioni audio scrivi \
-"non analizzato".
+- sonoro: in una o due frasi, cosa si sente (dialoghi, effetti, ambiente, musica e suo carattere), \
+basandoti sull'analisi del sonoro e sulle battute se presenti; se non hai informazioni audio scrivi \
+"non analizzato". Scrivi solo in italiano: le etichette dell'analisi del sonoro sono in inglese, \
+rendile con parole italiane dentro la frase e non riportarle in inglese, nemmeno tra parentesi \
+(es. "Si sentono voci sovrapposte e il rumore del traffico; un breve sussulto di lei").
 - dialoghi_riassunto: il contenuto di TUTTE le battute di questa inquadratura, nell'ordine in \
 cui vengono dette, con parole tue: chi dice cosa e che cosa si dicono (domande, risposte, \
 notizie, richieste, promesse). Non fermarti alla prima battuta e non ridurre uno scambio a un \
@@ -714,10 +716,19 @@ def costruisci_prompt(q: Inquadratura, vicini: list, max_scena: int, sonoro: str
     return "\n".join(parti)
 
 
+_D_EUFONICA = re.compile(r"\b([EeOoAa])d (?=[^\W\daeiouàèéìòùAEIOUÀÈÉÌÒÙhH])")
+
+
+def ritocca(testo: str) -> str:
+    """Piccoli errori ricorrenti del modello: "ed", "od", "ad" davanti a consonante ("Teresa ed Paolo")."""
+    return _D_EUFONICA.sub(r"\1 ", testo)
+
+
 def chiedi_al_modello(modello: str, prompt: str, immagini: list) -> dict:
     """Descrizione di un'inquadratura (solleva modulo_modello.ErroreModello se non arriva)."""
-    return modulo_modello.chiedi(prompt, [base64.b64encode(p.read_bytes()).decode() for p in immagini],
+    desc = modulo_modello.chiedi(prompt, [base64.b64encode(p.read_bytes()).decode() for p in immagini],
                                  SCHEMA, modello, temperatura=0.2, repeat_penalty=1.15)
+    return {k: ritocca(v) if isinstance(v, str) else v for k, v in desc.items()}
 
 
 # --------------------------------------------------------------------------
